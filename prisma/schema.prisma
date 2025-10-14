@@ -1,0 +1,24 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model GithubInstallation {
+  echoUserId     String   @map("echo_user_id")
+  installationId BigInt   @map("installation_id")
+  accountLogin   String?  @map("account_login")
+  accountId      BigInt?  @map("account_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@id([echoUserId, installationId])
+  @@index([echoUserId])
+  @@map("github_installations")
+}
