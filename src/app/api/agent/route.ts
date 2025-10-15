@@ -1,8 +1,7 @@
-"use server";
-
 import { openai } from "@/echo";
 import { Agent } from "@ai-sdk-tools/agents";
 import { InMemoryProvider } from "@ai-sdk-tools/memory";
+import { convertToModelMessages } from "ai";
 import { NextRequest } from "next/server";
 
 // Create a shared memory provider instance
@@ -65,7 +64,9 @@ export async function POST(request: NextRequest) {
 
   // Convert UI messages to model messages
 
+  const modelMessages = convertToModelMessages(messages);
+
   return orchestrator.toUIMessageStream({
-    messages,
+    messages: modelMessages,
   });
 }

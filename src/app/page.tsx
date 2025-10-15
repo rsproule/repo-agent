@@ -21,24 +21,39 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Reasoning } from "@/components/ai-elements/reasoning";
 import { Response } from "@/components/ai-elements/response";
-import type { ToolUIPart } from "ai";
+import {
+  Tool,
+  ToolContent,
+  ToolHeader,
+  ToolInput,
+  ToolOutput,
+} from "@/components/ai-elements/tool";
+import { EchoAccount } from "@/components/echo-account-next";
+import type { TextUIPart, ToolUIPart } from "ai";
 import { DefaultChatTransport } from "ai";
 import { useChat } from "ai-sdk-tools/client";
 import { Github } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function HomePage() {
   const [text, setText] = useState<string>("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { messages, sendMessage, status, stop } = useChat({
+  const { messages, sendMessage, status, stop, error } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/agent",
     }),
   });
 
+  useEffect(() => {
+    console.log("Messages:", messages);
+    console.log("Status:", status);
+    if (error) {
+      console.error("Chat error:", error);
+    }
+  }, [messages, status, error]);
+
   const handleSubmit = (message: PromptInputMessage) => {
-    // If currently streaming or submitted, stop instead of submitting
     if (status === "streaming" || status === "submitted") {
       stop();
       return;
@@ -55,120 +70,145 @@ export default function HomePage() {
     setText("");
   };
 
-  // Derive current tool call from messages
-  const currentToolCall = (() => {
-    if (messages.length === 0) return null;
-
-    const lastMessage = messages[messages.length - 1];
-    if (lastMessage.role !== "assistant") return null;
-
-    const textParts =
-      lastMessage.parts?.filter((part) => part.type === "text") ?? [];
-    const hasTextContent = textParts.some((part) => {
-      const textPart = part as { text?: string };
-      return textPart.text?.trim();
-    });
-
-    if (hasTextContent) return null;
-
-    const toolParts = (lastMessage.parts?.filter((part) =>
-      part.type.startsWith("tool-"),
-    ) ?? []) as ToolUIPart[];
-
-    const latestTool = toolParts[toolParts.length - 1];
-    if (!latestTool) return null;
-
-    const toolType = latestTool.type as string;
-    if (toolType === "dynamic-tool") {
-      const dynamicTool = latestTool as unknown as { toolName: string };
-      return dynamicTool.toolName;
-    }
-    return toolType.replace(/^tool-/, "");
-  })();
-
   const hasMessages = messages.length > 0;
 
+  // Helper to get text content from message parts
+  const getMessageText = (message: (typeof messages)[0]) => {
+    const textParts =
+      message.parts?.filter((part) => part.type === "text") ?? [];
+    return textParts.map((part) => (part as TextUIPart).text).join("");
+  };
+
+  // Helper to get tool parts from message
+  const getToolParts = (message: (typeof messages)[0]) => {
+    return (message.parts?.filter((part) => part.type.startsWith("tool-")) ??
+      []) as ToolUIPart[];
+  };
+
   return (
-    <div className="flex flex-col h-full">
-      {/* Chat Area */}
-      <div className="flex-1 overflow-auto">
-        <div className="max-w-4xl mx-auto px-4 pb-8">
-          {!hasMessages && (
-            <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)] text-center">
-              <div className="space-y-2 mb-8">
-                <h2 className="text-2xl font-bold">
-                  Welcome to GitHub Assistant
-                </h2>
-                <p className="text-muted-foreground">
-                  Ask me anything about your GitHub repositories
-                </p>
-              </div>
-            </div>
-          )}
-
-          <Conversation>
-            {messages.map((message, i) => (
-              <Message key={i} from={message.role}>
-                <MessageContent>
-                  {message.role === "assistant" ? (
-                    <Response>{message.content}</Response>
-                  ) : (
-                    message.content
-                  )}
-                </MessageContent>
-              </Message>
-            ))}
-
-            {status === "streaming" && (
-              <Message from="assistant">
-                <MessageContent>
-                  {currentToolCall ? (
-                    <Reasoning>Using {currentToolCall}...</Reasoning>
-                  ) : (
-                    <Reasoning>Thinking...</Reasoning>
-                  )}
-                </MessageContent>
-              </Message>
-            )}
-          </Conversation>
+    <div className="flex flex-col h-screen">
+      <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <div className="flex items-center justify-between w-full">
+          <div className="text-lg font-semibold">GitHub Assistant</div>
+          <EchoAccount />
         </div>
-      </div>
+      </header>
 
-      {/* Input Area - Fixed at bottom */}
-      <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="max-w-4xl mx-auto p-4">
-          <PromptInput multiple globalDrop onSubmit={handleSubmit}>
-            <PromptInputBody>
-              <PromptInputAttachments>
-                {(attachment) => <PromptInputAttachment data={attachment} />}
-              </PromptInputAttachments>
-              <PromptInputTextarea
-                onChange={(e) => setText(e.target.value)}
-                ref={textareaRef}
-                value={text}
-                placeholder="Ask me anything about your GitHub repositories..."
-              />
-            </PromptInputBody>
-            <PromptInputToolbar>
-              <PromptInputTools>
-                <PromptInputActionMenu>
-                  <PromptInputActionMenuTrigger />
-                  <PromptInputActionMenuContent>
-                    <PromptInputActionAddAttachments />
-                  </PromptInputActionMenuContent>
-                </PromptInputActionMenu>
-                <GithubConnectionsModal
-                  trigger={
-                    <PromptInputButton>
-                      <Github size={16} />
-                      <span>GitHub</span>
-                    </PromptInputButton>
-                  }
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex-1 overflow-auto p-4">
+          <div className="max-w-4xl mx-auto">
+            {!hasMessages && (
+              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-bold">
+                    Welcome to GitHub Assistant
+                  </h2>
+                  <p className="text-muted-foreground">
+                    Ask me anything about your GitHub repositories
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <Conversation>
+              {messages.map((message, i) => {
+                const messageText = getMessageText(message);
+                const toolParts = getToolParts(message);
+
+                return (
+                  <Message key={i} from={message.role}>
+                    <MessageContent>
+                      {/* Display text content */}
+                      {messageText && (
+                        <>
+                          {message.role === "assistant" ? (
+                            <Response>{messageText}</Response>
+                          ) : (
+                            messageText
+                          )}
+                        </>
+                      )}
+
+                      {/* Display tool calls */}
+                      {toolParts.map((tool, toolIndex) => (
+                        <Tool key={toolIndex}>
+                          <ToolHeader
+                            title={tool.toolName}
+                            type={tool.type}
+                            state={tool.state}
+                          />
+                          <ToolContent>
+                            {tool.input && <ToolInput input={tool.input} />}
+                            {(tool.output || tool.errorText) && (
+                              <ToolOutput
+                                output={tool.output}
+                                errorText={tool.errorText}
+                              />
+                            )}
+                          </ToolContent>
+                        </Tool>
+                      ))}
+                    </MessageContent>
+                  </Message>
+                );
+              })}
+
+              {status === "streaming" && (
+                <Message from="assistant">
+                  <MessageContent>
+                    <Reasoning>Thinking...</Reasoning>
+                  </MessageContent>
+                </Message>
+              )}
+
+              {error && (
+                <Message from="assistant">
+                  <MessageContent>
+                    <div className="text-destructive">
+                      Error: {error.message || "Something went wrong"}
+                    </div>
+                  </MessageContent>
+                </Message>
+              )}
+            </Conversation>
+          </div>
+        </div>
+
+        <div className="border-t bg-background p-4">
+          <div className="max-w-4xl mx-auto">
+            <PromptInput multiple globalDrop onSubmit={handleSubmit}>
+              <PromptInputBody>
+                <PromptInputAttachments>
+                  {(attachment) => <PromptInputAttachment data={attachment} />}
+                </PromptInputAttachments>
+                <PromptInputTextarea
+                  onChange={(e) => setText(e.target.value)}
+                  ref={textareaRef}
+                  value={text}
+                  placeholder="Ask me anything about your GitHub repositories..."
                 />
-              </PromptInputTools>
-              <PromptInputSubmit status={status} />
-            </PromptInputToolbar>
-          </PromptInput>
+              </PromptInputBody>
+              <PromptInputToolbar>
+                <PromptInputTools>
+                  <PromptInputActionMenu>
+                    <PromptInputActionMenuTrigger />
+                    <PromptInputActionMenuContent>
+                      <PromptInputActionAddAttachments />
+                    </PromptInputActionMenuContent>
+                  </PromptInputActionMenu>
+                  <GithubConnectionsModal
+                    trigger={
+                      <PromptInputButton>
+                        <Github size={16} />
+                        <span>GitHub</span>
+                      </PromptInputButton>
+                    }
+                  />
+                </PromptInputTools>
+                <PromptInputSubmit status={status} />
+              </PromptInputToolbar>
+            </PromptInput>
+          </div>
         </div>
       </div>
     </div>
