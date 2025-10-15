@@ -18,7 +18,7 @@ export default async function Home({ searchParams }: PageProps) {
     <div className="space-y-2">
       <ImportGithub />
       {owner && repo && <ReadmeSummarizer owner={owner} repo={repo} />}
-    
+
     </div>
   );
 }

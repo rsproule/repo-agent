@@ -1,5 +1,6 @@
 import { getUser } from "@/echo";
-import { getSupabaseServer } from "@/lib/supabase";
+import { prisma } from "@/lib/db";
+import { normalizePrivateKey } from "@/lib/github";
 import { App } from "@octokit/app";
 import { NextResponse } from "next/server";
 
@@ -24,68 +25,100 @@ type GitHubRepo = {
 };
 
 export async function GET() {
-  const user = await getUser();
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const supabase = getSupabaseServer();
-  const { data: installs, error } = await supabase
-    .from("github_installations")
-    .select("installation_id, account_login, account_id")
-    .eq("echo_user_id", user.id);
-  if (error)
-    return NextResponse.json({ error: error.message }, { status: 500 });
-
-  const app = new App({
-    appId: process.env.GITHUB_APP_ID!,
-    privateKey: process.env.GITHUB_APP_PRIVATE_KEY!,
-  });
-
-  const connections: Array<{
-    installation_id: number;
-    account_login?: string | null;
-    account_id?: number | null;
-    repositories: RepoMeta[];
-  }> = [];
-
-  for (const inst of installs ?? []) {
-    const octokit = await app.getInstallationOctokit(
-      Number(inst.installation_id),
-    );
-    // List repositories accessible to the installation
-    const repos: RepoMeta[] = [];
-    let page = 1;
-    while (true) {
-      const { data } = await octokit.request("GET /installation/repositories", {
-        per_page: 100,
-        page,
-      });
-      for (const r of data.repositories as GitHubRepo[]) {
-        const repo = r;
-        repos.push({
-          id: repo.id,
-          name: repo.name,
-          full_name: repo.full_name,
-          private: repo.private,
-          html_url: repo.html_url,
-          default_branch: repo.default_branch,
-          owner: {
-            login: repo.owner?.login,
-            id: repo.owner?.id,
-            html_url: repo.owner?.html_url,
-          },
-        });
-      }
-      if (data.repositories.length < 100) break;
-      page += 1;
+  try {
+    const user = await getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    connections.push({
-      installation_id: Number(inst.installation_id),
-      account_login: inst.account_login ?? null,
-      account_id: inst.account_id ?? null,
-      repositories: repos,
-    });
-  }
 
-  return NextResponse.json({ connections });
+    // Fetch installations from Prisma
+    const installs = await prisma.githubInstallation.findMany({
+      where: {
+        echoUserId: user.id,
+      },
+      select: {
+        installationId: true,
+        accountLogin: true,
+        accountId: true,
+      },
+    });
+
+    if (!installs || installs.length === 0) {
+      return NextResponse.json({ connections: [] });
+    }
+
+    const app = new App({
+      appId: process.env.GITHUB_APP_ID!,
+      privateKey: normalizePrivateKey(process.env.GITHUB_APP_PRIVATE_KEY!),
+    });
+
+    const connections: Array<{
+      installation_id: number;
+      account_login?: string | null;
+      account_id?: number | null;
+      repositories: RepoMeta[];
+    }> = [];
+
+    for (const inst of installs) {
+      try {
+        const octokit = await app.getInstallationOctokit(
+          Number(inst.installationId),
+        );
+
+        // List repositories accessible to the installation
+        const repos: RepoMeta[] = [];
+        let page = 1;
+
+        while (true) {
+          const { data } = await octokit.request(
+            "GET /installation/repositories",
+            {
+              per_page: 100,
+              page,
+            },
+          );
+
+          for (const r of data.repositories as GitHubRepo[]) {
+            repos.push({
+              id: r.id,
+              name: r.name,
+              full_name: r.full_name,
+              private: r.private,
+              html_url: r.html_url,
+              default_branch: r.default_branch,
+              owner: {
+                login: r.owner?.login,
+                id: r.owner?.id,
+                html_url: r.owner?.html_url,
+              },
+            });
+          }
+
+          if (data.repositories.length < 100) break;
+          page += 1;
+        }
+
+        connections.push({
+          installation_id: Number(inst.installationId),
+          account_login: inst.accountLogin ?? null,
+          account_id: inst.accountId ? Number(inst.accountId) : null,
+          repositories: repos,
+        });
+      } catch (error) {
+        console.error(
+          `Failed to fetch repos for installation ${inst.installationId}:`,
+          error,
+        );
+        // Continue with other installations even if one fails
+      }
+    }
+
+    return NextResponse.json({ connections });
+  } catch (error) {
+    console.error("GitHub connections error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch GitHub connections" },
+      { status: 500 },
+    );
+  }
 }
