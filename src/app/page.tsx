@@ -19,7 +19,6 @@ import {
   PromptInputToolbar,
   PromptInputTools,
 } from "@/components/ai-elements/prompt-input";
-import { Reasoning } from "@/components/ai-elements/reasoning";
 import { Response } from "@/components/ai-elements/response";
 import {
   Tool,
@@ -33,7 +32,7 @@ import type { TextUIPart, ToolUIPart } from "ai";
 import { DefaultChatTransport } from "ai";
 import { useChat } from "ai-sdk-tools/client";
 import { Github } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 export default function HomePage() {
   const [text, setText] = useState<string>("");
@@ -44,14 +43,6 @@ export default function HomePage() {
       api: "/api/agent",
     }),
   });
-
-  useEffect(() => {
-    console.log("Messages:", messages);
-    console.log("Status:", status);
-    if (error) {
-      console.error("Chat error:", error);
-    }
-  }, [messages, status, error]);
 
   const handleSubmit = (message: PromptInputMessage) => {
     if (status === "streaming" || status === "submitted") {
@@ -118,17 +109,6 @@ export default function HomePage() {
                 return (
                   <Message key={i} from={message.role}>
                     <MessageContent>
-                      {/* Display text content */}
-                      {messageText && (
-                        <>
-                          {message.role === "assistant" ? (
-                            <Response>{messageText}</Response>
-                          ) : (
-                            messageText
-                          )}
-                        </>
-                      )}
-
                       {/* Display tool calls */}
                       {toolParts.map((tool, toolIndex) => (
                         <Tool key={toolIndex}>
@@ -148,18 +128,21 @@ export default function HomePage() {
                           </ToolContent>
                         </Tool>
                       ))}
+
+                      {/* Display text content */}
+                      {messageText && (
+                        <>
+                          {message.role === "assistant" ? (
+                            <Response>{messageText}</Response>
+                          ) : (
+                            messageText
+                          )}
+                        </>
+                      )}
                     </MessageContent>
                   </Message>
                 );
               })}
-
-              {status === "streaming" && (
-                <Message from="assistant">
-                  <MessageContent>
-                    <Reasoning>Thinking...</Reasoning>
-                  </MessageContent>
-                </Message>
-              )}
 
               {error && (
                 <Message from="assistant">
