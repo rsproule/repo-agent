@@ -9,15 +9,39 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Repository } from '@/types/github';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 
 interface Connection {
   installation_id: number;
   account_login?: string | null;
   account_id?: number | null;
   repositories: Repository[];
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        <span className="text-sm text-muted-foreground">Loading repositories...</span>
+      </div>
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="flex items-center justify-between py-3">
+            <div className="space-y-2 flex-1">
+              <Skeleton className="h-5 w-[60%]" />
+              <Skeleton className="h-4 w-[30%]" />
+            </div>
+            <Skeleton className="h-9 w-20" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function ImportGithub(): React.ReactElement {
@@ -60,8 +84,6 @@ export default function ImportGithub(): React.ReactElement {
     };
   }, []);
 
-  // Inline panel; no global outside-click handler needed
-
   const orgOptions = useMemo(() => {
     const seen = new Set<string>();
     const options: Array<{ key: string; label: string }> = [];
@@ -96,14 +118,19 @@ export default function ImportGithub(): React.ReactElement {
         );
   }, [connections, orgFilter, query]);
 
-  if (loading) return <div>Loading repositories…</div>;
-  if (error) return <div className="text-red-500">{error}</div>;
+  if (error) {
+    return (
+      <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+        <p className="text-sm text-destructive">{error}</p>
+      </div>
+    );
+  }
 
   const hasConnections = connections.length > 0;
 
   return (
     <div className="w-full">
-      <div className="w-full max-w-2xl space-y-3 mx-auto">
+      <div className="w-full space-y-4">
         {!open && hasSelectedRepo ? (
           <div className="w-full rounded-lg border bg-background p-3 flex items-center justify-between">
             <div className="truncate">
@@ -122,89 +149,91 @@ export default function ImportGithub(): React.ReactElement {
           </div>
         ) : (
           <>
-            <div className="text-xl font-semibold text-center">
-              Import Git Repository
-            </div>
-
             <div
               ref={panelRef}
               className="w-full rounded-lg border bg-background p-4 shadow-sm"
             >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div className="text-sm text-muted-foreground">
-                  Organization
-                </div>
-                <Select
-                  value={orgFilter}
-                  onValueChange={value => {
-                    if (value === '__add__') {
-                      window.location.href = '/api/github/install';
-                      return;
-                    }
-                    setOrgFilter(value);
-                  }}
-                >
-                  <SelectTrigger className="w-full sm:w-[240px]">
-                    <SelectValue placeholder="Select org" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    {orgOptions.map(o => (
-                      <SelectItem key={o.key} value={o.key}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="__add__">
-                      + Add GitHub Account
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <div className="w-full sm:ml-auto sm:flex-1 sm:max-w-sm">
-                  <Input
-                    value={query}
-                    onChange={e => setQuery(e.target.value)}
-                    placeholder="Search repositories..."
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4 divide-y">
-                {repos.slice(0, 5).map(repo => (
-                  <div
-                    key={repo.id}
-                    className="flex items-center justify-between py-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate font-medium">
-                        {repo.full_name}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {repo.private ? 'private' : 'public'}
-                      </div>
+              {loading ? (
+                <LoadingSkeleton />
+              ) : (
+                <>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center mb-4">
+                    <div className="text-sm text-muted-foreground">
+                      Organization
                     </div>
-                    <Button
-                      onClick={() => {
-                        const [ownerName, name] = repo.full_name.split('/');
-                        router.push(`/?owner=${ownerName}&repo=${name}`);
-                        setOpen(false);
+                    <Select
+                      value={orgFilter}
+                      onValueChange={value => {
+                        if (value === '__add__') {
+                          window.location.href = '/api/github/install';
+                          return;
+                        }
+                        setOrgFilter(value);
                       }}
-                      variant="default"
-                      className="ml-4"
                     >
-                      Import
-                    </Button>
-                  </div>
-                ))}
+                      <SelectTrigger className="w-full sm:w-[240px]">
+                        <SelectValue placeholder="Select org" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        {orgOptions.map(o => (
+                          <SelectItem key={o.key} value={o.key}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="__add__">
+                          + Add GitHub Account
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
 
-                {repos.length === 0 && (
-                  <div className="py-10 text-center text-sm text-muted-foreground">
-                    No repositories found.
+                    <div className="w-full sm:ml-auto sm:flex-1 sm:max-w-sm">
+                      <Input
+                        value={query}
+                        onChange={e => setQuery(e.target.value)}
+                        placeholder="Search repositories..."
+                      />
+                    </div>
                   </div>
-                )}
-              </div>
 
-              {!hasConnections && (
+                  <div className="divide-y">
+                    {repos.slice(0, 5).map(repo => (
+                      <div
+                        key={repo.id}
+                        className="flex items-center justify-between py-3"
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate font-medium">
+                            {repo.full_name}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {repo.private ? 'private' : 'public'}
+                          </div>
+                        </div>
+                        <Button
+                          onClick={() => {
+                            const [ownerName, name] = repo.full_name.split('/');
+                            router.push(`/?owner=${ownerName}&repo=${name}`);
+                            setOpen(false);
+                          }}
+                          variant="default"
+                          className="ml-4"
+                        >
+                          Import
+                        </Button>
+                      </div>
+                    ))}
+
+                    {repos.length === 0 && !loading && (
+                      <div className="py-10 text-center text-sm text-muted-foreground">
+                        No repositories found.
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {!hasConnections && !loading && (
                 <div className="mt-4 flex items-center justify-between rounded-md border p-3">
                   <div className="text-sm">No GitHub connections yet.</div>
                   <Button
