@@ -13,9 +13,6 @@
     "prisma:studio": "prisma studio"
   },
   "dependencies": {
-    "@ai-sdk-tools/agents": "^0.2.2",
-    "@ai-sdk-tools/devtools": "^0.8.4",
-    "@ai-sdk-tools/memory": "^0.1.2",
     "@ai-sdk-tools/store": "^0.8.2",
     "@ai-sdk/react": "^2.0.48",
     "@merit-systems/echo-next-sdk": "0.0.26",
@@ -37,11 +34,10 @@
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@radix-ui/react-use-controllable-state": "^1.2.2",
-    "@supabase/supabase-js": "^2.57.4",
+    "@tanstack/react-query": "^5.90.3",
     "@trigger.dev/sdk": "^4.0.4",
     "@xyflow/react": "^12.8.6",
     "ai": "^5.0.35",
-    "ai-sdk-tools": "^0.4.7",
     "autonumeric": "^4.10.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

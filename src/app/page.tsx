@@ -28,32 +28,50 @@ import {
   ToolOutput,
 } from "@/components/ai-elements/tool";
 import { EchoAccount } from "@/components/echo-account-next";
-import type { TextUIPart, ToolUIPart } from "ai";
-import { DefaultChatTransport } from "ai";
-import { useChat } from "ai-sdk-tools/client";
-import { Github } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { useChat } from "@ai-sdk/react";
+import { useQuery } from "@tanstack/react-query";
+import { DefaultChatTransport, type TextUIPart, type ToolUIPart } from "ai";
+import { Folder, Github } from "lucide-react";
 import { useRef, useState } from "react";
+
+interface Repository {
+  id: number;
+  name: string;
+  full_name: string;
+  private: boolean;
+  html_url: string;
+}
+
+interface Connection {
+  installation_id: number;
+  account_login?: string | null;
+  repositories: Repository[];
+}
 
 export default function HomePage() {
   const [text, setText] = useState<string>("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { messages, sendMessage, status, stop, error } = useChat({
+  const { data: connectionsData } = useQuery({
+    queryKey: ["github-connections"],
+    queryFn: async () => {
+      const res = await fetch("/api/github/connections");
+      if (!res.ok) throw new Error("Failed to fetch connections");
+      return res.json() as Promise<{ connections: Connection[] }>;
+    },
+  });
+
+  const { messages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/agent",
     }),
   });
 
   const handleSubmit = (message: PromptInputMessage) => {
-    if (status === "streaming" || status === "submitted") {
-      stop();
-      return;
-    }
-
     const hasText = Boolean(message.text);
-    const hasAttachments = Boolean(message.files?.length);
 
-    if (!(hasText || hasAttachments)) {
+    if (!hasText) {
       return;
     }
 
@@ -62,6 +80,8 @@ export default function HomePage() {
   };
 
   const hasMessages = messages.length > 0;
+  const connections = connectionsData?.connections ?? [];
+  const allRepos = connections.flatMap((c) => c.repositories);
 
   // Helper to get text content from message parts
   const getMessageText = (message: (typeof messages)[0]) => {
@@ -110,24 +130,38 @@ export default function HomePage() {
                   <Message key={i} from={message.role}>
                     <MessageContent>
                       {/* Display tool calls */}
-                      {toolParts.map((tool, toolIndex) => (
-                        <Tool key={toolIndex}>
-                          <ToolHeader
-                            title={tool.toolName}
-                            type={tool.type}
-                            state={tool.state}
-                          />
-                          <ToolContent>
-                            {tool.input && <ToolInput input={tool.input} />}
-                            {(tool.output || tool.errorText) && (
-                              <ToolOutput
-                                output={tool.output}
-                                errorText={tool.errorText}
-                              />
-                            )}
-                          </ToolContent>
-                        </Tool>
-                      ))}
+                      {toolParts.map((tool, toolIndex) => {
+                        const toolName = tool.type.replace(/^tool-/, "");
+                        return (
+                          <Tool key={toolIndex}>
+                            <ToolHeader
+                              title={toolName}
+                              type={tool.type}
+                              state={tool.state}
+                            />
+                            <ToolContent>
+                              {"input" in tool && tool.input !== undefined && (
+                                <ToolInput input={tool.input} />
+                              )}
+                              {(("output" in tool &&
+                                tool.output !== undefined) ||
+                                ("errorText" in tool &&
+                                  tool.errorText !== undefined)) && (
+                                <ToolOutput
+                                  output={
+                                    "output" in tool ? tool.output : undefined
+                                  }
+                                  errorText={
+                                    "errorText" in tool
+                                      ? tool.errorText
+                                      : undefined
+                                  }
+                                />
+                              )}
+                            </ToolContent>
+                          </Tool>
+                        );
+                      })}
 
                       {/* Display text content */}
                       {messageText && (
@@ -143,22 +177,30 @@ export default function HomePage() {
                   </Message>
                 );
               })}
-
-              {error && (
-                <Message from="assistant">
-                  <MessageContent>
-                    <div className="text-destructive">
-                      Error: {error.message || "Something went wrong"}
-                    </div>
-                  </MessageContent>
-                </Message>
-              )}
             </Conversation>
           </div>
         </div>
 
         <div className="border-t bg-background p-4">
           <div className="max-w-4xl mx-auto">
+            {/* Connected Repos Display */}
+            {allRepos.length > 0 && (
+              <div className="mb-4 flex items-center gap-2 flex-wrap">
+                <span className="text-sm text-muted-foreground">
+                  Connected:
+                </span>
+                {allRepos.slice(0, 5).map((repo) => (
+                  <Badge key={repo.id} variant="secondary" className="gap-1">
+                    <Folder className="h-3 w-3" />
+                    {repo.full_name}
+                  </Badge>
+                ))}
+                {allRepos.length > 5 && (
+                  <Badge variant="outline">+{allRepos.length - 5} more</Badge>
+                )}
+              </div>
+            )}
+
             <PromptInput multiple globalDrop onSubmit={handleSubmit}>
               <PromptInputBody>
                 <PromptInputAttachments>

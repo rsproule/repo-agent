@@ -1,5 +1,7 @@
 "use client";
 
+import ImportGithub from "@/app/components/import-github";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -8,8 +10,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import ImportGithub from "@/app/components/ImportGithub";
 import { Settings } from "lucide-react";
 
 interface GithubConnectionsModalProps {
