@@ -69,13 +69,14 @@ export default function HomePage() {
   });
 
   const handleSubmit = (message: PromptInputMessage) => {
-    const hasText = Boolean(message.text);
-
-    if (!hasText) {
+    if (!message.text) {
       return;
     }
 
-    sendMessage(message);
+    sendMessage({
+      text: message.text,
+      files: message.files,
+    });
     setText("");
   };
 
