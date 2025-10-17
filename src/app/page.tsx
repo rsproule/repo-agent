@@ -131,38 +131,30 @@ export default function HomePage() {
                   <Message key={i} from={message.role}>
                     <MessageContent>
                       {/* Display tool calls */}
-                      {toolParts.map((tool, toolIndex) => {
-                        const toolName = tool.type.replace(/^tool-/, "");
-                        return (
-                          <Tool key={toolIndex}>
-                            <ToolHeader
-                              title={toolName}
-                              type={tool.type}
-                              state={tool.state}
-                            />
-                            <ToolContent>
-                              {"input" in tool && tool.input !== undefined && (
-                                <ToolInput input={tool.input} />
-                              )}
-                              {(("output" in tool &&
-                                tool.output !== undefined) ||
-                                ("errorText" in tool &&
-                                  tool.errorText !== undefined)) && (
-                                <ToolOutput
-                                  output={
-                                    "output" in tool ? tool.output : undefined
-                                  }
-                                  errorText={
-                                    "errorText" in tool
-                                      ? tool.errorText
-                                      : undefined
-                                  }
-                                />
-                              )}
-                            </ToolContent>
-                          </Tool>
-                        );
-                      })}
+                      {toolParts.map((tool, toolIndex) => (
+                        <Tool key={toolIndex}>
+                          <ToolHeader type={tool.type} state={tool.state} />
+                          <ToolContent>
+                            {"input" in tool && tool.input !== undefined && (
+                              <ToolInput input={tool.input} />
+                            )}
+                            {(("output" in tool && tool.output !== undefined) ||
+                              ("errorText" in tool &&
+                                tool.errorText !== undefined)) && (
+                              <ToolOutput
+                                output={
+                                  "output" in tool ? tool.output : undefined
+                                }
+                                errorText={
+                                  "errorText" in tool
+                                    ? tool.errorText
+                                    : undefined
+                                }
+                              />
+                            )}
+                          </ToolContent>
+                        </Tool>
+                      ))}
 
                       {/* Display text content */}
                       {messageText && (

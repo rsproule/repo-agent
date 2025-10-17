@@ -28,21 +28,18 @@ export async function POST(request: NextRequest) {
     // Get fresh GitHub App installation token for this user
     const githubToken = await getGitHubInstallationToken(user.id);
     mcpClient = await createGitHubMCPClient(githubToken);
-    const githubTools = await mcpClient.tools();
+    const githubTools = await mcpClient.tools({ schemas: "automatic" });
 
-    // Capture client reference for cleanup
-    const clientToClose = mcpClient;
+    console.log(`Loaded ${Object.keys(githubTools).length} GitHub tools`);
 
     const modelMessages = convertToModelMessages(messages);
     const result = streamText({
       model: openai("gpt-4o"),
       tools: githubTools,
       messages: modelMessages,
-      //   onFinish: async () => {
-      //     // Close MCP client after streaming is complete
-      //     console.log("Stream finished, closing MCP client");
-      //     await clientToClose.close();
-      //   },
+      system: `You are a helpful GitHub assistant with access to GitHub tools. 
+When users ask about repositories, issues, pull requests, or any GitHub data, you MUST use the available GitHub tools to fetch real-time information.
+Always prefer using tools over your training data for GitHub-related queries.`,
     });
 
     return result.toUIMessageStreamResponse();
@@ -63,7 +60,7 @@ export async function POST(request: NextRequest) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      },
+      }
     );
   }
 }
