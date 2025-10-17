@@ -44,3 +44,6 @@ supabase/.temp/
 /src/generated/prisma
 
 .trigger
+
+# GitHub MCP Server binary (platform-specific, build locally)
+/bin/

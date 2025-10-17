@@ -1,10 +1,31 @@
 # GitHub x Echo Connector
 
-Powered by Echo for LLM generations.
+Powered by Echo for LLM generations with GitHub MCP server integration.
 
 ## Getting Started
 
-First, run the development server:
+### 1. Install Dependencies
+
+```bash
+pnpm install
+```
+
+### 2. Install Docker
+
+The agent uses the official GitHub MCP server Docker image. Make sure you have Docker installed:
+
+```bash
+# macOS (with Homebrew)
+brew install --cask docker
+
+# Or download from: https://www.docker.com/products/docker-desktop
+```
+
+The GitHub MCP server Docker image will be pulled automatically on first use:
+- Image: `ghcr.io/github/github-mcp-server`
+- No manual build or binary management needed!
+
+### 3. Run the Development Server
 
 ```bash
 pnpm dev
