@@ -195,6 +195,43 @@ export default function TestTriggerPage() {
     }
   };
 
+  const handleFullResync = async () => {
+    if (
+      !confirm(
+        "⚠️ This will re-classify ALL PRs from scratch. This can be expensive! Continue?",
+      )
+    ) {
+      return;
+    }
+
+    setBucketLoading(true);
+    setBucketResult(null);
+
+    try {
+      const response = await fetch("/api/test/bucket-prs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ repository, fullResync: true }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setBucketResult({ error: data.error || "Failed to bucket PRs" });
+      } else {
+        setBucketResult(data);
+      }
+    } catch (error) {
+      setBucketResult({
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    } finally {
+      setBucketLoading(false);
+    }
+  };
+
   return (
     <div className="container mx-auto py-10 max-w-[95vw] space-y-6">
       <Card className="w-full">
@@ -335,13 +372,30 @@ export default function TestTriggerPage() {
             />
           </div>
 
-          <Button
-            onClick={handleBucketPRs}
-            disabled={bucketLoading || !repository}
-            className="w-full"
-          >
-            {bucketLoading ? "Classifying..." : "Bucket PRs"}
-          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              onClick={handleBucketPRs}
+              disabled={bucketLoading || !repository}
+              className="w-full"
+            >
+              {bucketLoading ? "Classifying..." : "Bucket New PRs"}
+            </Button>
+            <Button
+              onClick={handleFullResync}
+              disabled={bucketLoading || !repository}
+              variant="destructive"
+              className="w-full"
+            >
+              {bucketLoading ? "Re-classifying..." : "Full Re-sync"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            <strong>Bucket New PRs:</strong> Only classify unclassified PRs
+            (recommended)
+            <br />
+            <strong>Full Re-sync:</strong> Re-classify ALL PRs from scratch
+            (expensive!)
+          </p>
 
           {bucketResult && (
             <div className="space-y-4">

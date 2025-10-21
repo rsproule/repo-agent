@@ -384,8 +384,60 @@ export async function bucketPRs(
 
     // Batch insert classifications
     if (bucketEntries.length > 0) {
+      // Insert buckets
       await prisma.prBucket.createMany({
         data: bucketEntries,
+        skipDuplicates: true,
+      });
+
+      // Get author info for the PRs
+      const prNumbers = bucketEntries.map((e) => e.prNumber);
+      const prAuthors = await prisma.pullRequestRecord.findMany({
+        where: {
+          owner,
+          repo,
+          prNumber: { in: prNumbers },
+        },
+        select: {
+          prNumber: true,
+          author: true,
+        },
+      });
+
+      const authorMap = new Map(
+        prAuthors.map((pr) => [pr.prNumber, pr.author]),
+      );
+
+      // Simultaneously create scores from buckets
+      // Bucket → Score mapping: 0→-2.0, 1→-1.0, 2→1.0, 3→2.0
+      const scoreEntries = bucketEntries.map((entry) => {
+        const score =
+          entry.bucket === 0
+            ? -2.0
+            : entry.bucket === 1
+            ? -1.0
+            : entry.bucket === 2
+            ? 1.0
+            : 2.0;
+
+        return {
+          prId: entry.prId,
+          owner: entry.owner,
+          repo: entry.repo,
+          prNumber: entry.prNumber,
+          author: authorMap.get(entry.prNumber) || "unknown",
+          authorGithubId: null,
+          bucket: entry.bucket,
+          score,
+          initRunId: classificationRun.runId,
+          initVersion: "bts1.0",
+          updaterVersion: null,
+        };
+      });
+
+      // Insert scores
+      await prisma.prScore.createMany({
+        data: scoreEntries,
         skipDuplicates: true,
       });
 
@@ -394,6 +446,7 @@ export async function bucketPRs(
 
       logger.info("Batch complete", {
         processed: bucketEntries.length,
+        scores: scoreEntries.length,
         batchCost: batchCost.toFixed(4),
         totalCost: totalCost.toFixed(4),
       });

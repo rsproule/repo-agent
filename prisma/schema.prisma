@@ -44,6 +44,7 @@ model PullRequestRecord {
 
   analysis PRAnalysisRecord?
   buckets  PrBucket[]
+  scores   PrScore[]
 
   @@id([owner, repo, prNumber])
   @@index([owner, repo])
@@ -115,4 +116,31 @@ model PrBucket {
   @@index([bucket])
   @@index([runId])
   @@map("pr_buckets")
+}
+
+model PrScore {
+  id             String   @id @default(cuid())
+  prId           BigInt   @map("pr_id")
+  owner          String
+  repo           String
+  prNumber       Int      @map("pr_number")
+  author         String // GitHub login
+  authorGithubId BigInt?  @map("author_github_id")
+  bucket         Int // Copied from PrBucket for easier querying
+  score          Float // Bucket → Score: 0→-2.0, 1→-1.0, 2→1.0, 3→2.0
+  initRunId      String   @map("init_run_id")
+  initVersion    String   @default("bts1.0") @map("init_version")
+  updaterVersion String?  @map("updater_version")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+
+  pullRequest PullRequestRecord @relation(fields: [owner, repo, prNumber], references: [owner, repo, prNumber], onDelete: Cascade)
+
+  @@unique([owner, repo, prNumber])
+  @@index([owner, repo])
+  @@index([prId])
+  @@index([author])
+  @@index([bucket])
+  @@index([initRunId])
+  @@map("pr_scores")
 }
