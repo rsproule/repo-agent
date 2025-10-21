@@ -43,6 +43,7 @@ model PullRequestRecord {
   updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at")
 
   analysis PRAnalysisRecord?
+  buckets  PrBucket[]
 
   @@id([owner, repo, prNumber])
   @@index([owner, repo])
@@ -70,4 +71,48 @@ model PRAnalysisRecord {
   @@id([owner, repo, prNumber])
   @@index([relevance])
   @@map("pr_analyses")
+}
+
+model PrBucketClassificationRun {
+  runId           String    @id @default(cuid()) @map("run_id")
+  owner           String
+  repo            String
+  lowestPrNumber  Int       @map("lowest_pr_number")
+  highestPrNumber Int       @map("highest_pr_number")
+  prCount         Int       @map("pr_count")
+  version         String?
+  model           String?
+  totalCost       Float?    @map("total_cost")
+  completedAt     DateTime? @map("completed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  buckets PrBucket[]
+
+  @@index([owner, repo])
+  @@index([createdAt])
+  @@map("pr_bucket_classification_runs")
+}
+
+model PrBucket {
+  id           String   @id @default(cuid())
+  runId        String   @map("run_id")
+  owner        String
+  repo         String
+  prNumber     Int      @map("pr_number")
+  prId         BigInt   @map("pr_id")
+  bucket       Int // 0-3 representing complexity/impact
+  additions    Int?
+  deletions    Int?
+  changedFiles Int?     @map("changed_files")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  run         PrBucketClassificationRun @relation(fields: [runId], references: [runId], onDelete: Cascade)
+  pullRequest PullRequestRecord         @relation(fields: [owner, repo, prNumber], references: [owner, repo, prNumber], onDelete: Cascade)
+
+  @@unique([runId, owner, repo, prNumber])
+  @@index([owner, repo])
+  @@index([bucket])
+  @@index([runId])
+  @@map("pr_buckets")
 }

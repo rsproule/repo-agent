@@ -16,7 +16,7 @@ importers:
         version: 2.0.48(react@19.1.0)(zod@4.1.12)
       '@merit-systems/echo-next-sdk':
         specifier: 0.0.26
-        version: 0.0.26(@ai-sdk/react@2.0.48(react@19.1.0)(zod@4.1.12))(next@15.5.2(@opentelemetry/api@1.9.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(zod@4.1.12)
+        version: 0.0.26(@ai-sdk/react@2.0.48(react@19.1.0)(zod@4.1.12))(next@15.5.2(@opentelemetry/api@1.9.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(openai@6.6.0(ws@8.18.3)(zod@4.1.12))(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(zod@4.1.12)
       '@modelcontextprotocol/sdk':
         specifier: ^1.20.1
         version: 1.20.1
@@ -119,6 +119,9 @@ importers:
       octokit:
         specifier: ^5.0.4
         version: 5.0.4
+      openai:
+        specifier: ^6.6.0
+        version: 6.6.0(ws@8.18.3)(zod@4.1.12)
       pg:
         specifier: ^8.16.3
         version: 8.16.3
@@ -4022,6 +4025,18 @@ packages:
   oniguruma-to-es@4.3.3:
     resolution: {integrity: sha512-rPiZhzC3wXwE59YQMRDodUwwT9FZ9nNBwQQfsd1wfdtlKEyCdRV0avrTcSZ5xlIvGRVPd/cx6ZN45ECmS39xvg==}
 
+  openai@6.6.0:
+    resolution: {integrity: sha512-1yWk4cBsHF5Bq9TreHYOHY7pbqdlT74COnm8vPx7WKn36StS+Hyk8DdAitnLaw67a5Cudkz5EmlFQjSrNnrA2w==}
+    hasBin: true
+    peerDependencies:
+      ws: ^8.18.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      ws:
+        optional: true
+      zod:
+        optional: true
+
   optionator@0.9.4:
     resolution: {integrity: sha512-6IpQ7mKUxRcZNLIObR0hz7lxsapSSIYNZJwXPGeF0mTVqGKFIXj1DQcMoT22S3ROcLyY/rz0PWaWZ9ayWmad9g==}
     engines: {node: '>= 0.8.0'}
@@ -5428,9 +5443,9 @@ snapshots:
 
   '@jsonhero/path@1.0.21': {}
 
-  '@merit-systems/echo-next-sdk@0.0.26(@ai-sdk/react@2.0.48(react@19.1.0)(zod@4.1.12))(next@15.5.2(@opentelemetry/api@1.9.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(zod@4.1.12)':
+  '@merit-systems/echo-next-sdk@0.0.26(@ai-sdk/react@2.0.48(react@19.1.0)(zod@4.1.12))(next@15.5.2(@opentelemetry/api@1.9.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(openai@6.6.0(ws@8.18.3)(zod@4.1.12))(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(zod@4.1.12)':
     dependencies:
-      '@merit-systems/echo-react-sdk': 1.0.35(@ai-sdk/react@2.0.48(react@19.1.0)(zod@4.1.12))(ai@5.0.71(zod@4.1.12))(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(zod@4.1.12)
+      '@merit-systems/echo-react-sdk': 1.0.35(@ai-sdk/react@2.0.48(react@19.1.0)(zod@4.1.12))(ai@5.0.71(zod@4.1.12))(openai@6.6.0(ws@8.18.3)(zod@4.1.12))(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(zod@4.1.12)
       '@merit-systems/echo-typescript-sdk': 1.0.19(zod@4.1.12)
       ai: 5.0.71(zod@4.1.12)
       jwt-decode: 4.0.0
@@ -5443,7 +5458,7 @@ snapshots:
       - openai
       - zod
 
-  '@merit-systems/echo-react-sdk@1.0.35(@ai-sdk/react@2.0.48(react@19.1.0)(zod@4.1.12))(ai@5.0.71(zod@4.1.12))(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(zod@4.1.12)':
+  '@merit-systems/echo-react-sdk@1.0.35(@ai-sdk/react@2.0.48(react@19.1.0)(zod@4.1.12))(ai@5.0.71(zod@4.1.12))(openai@6.6.0(ws@8.18.3)(zod@4.1.12))(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(zod@4.1.12)':
     dependencies:
       '@ai-sdk/react': 2.0.48(react@19.1.0)(zod@4.1.12)
       '@merit-systems/echo-typescript-sdk': 1.0.19(zod@4.1.12)
@@ -5454,6 +5469,8 @@ snapshots:
       react-dom: 19.1.0(react@19.1.0)
       react-oidc-context: 3.3.0(oidc-client-ts@3.3.0)(react@19.1.0)
       swr: 2.3.6(react@19.1.0)
+    optionalDependencies:
+      openai: 6.6.0(ws@8.18.3)(zod@4.1.12)
     transitivePeerDependencies:
       - zod
 
@@ -9363,6 +9380,11 @@ snapshots:
       oniguruma-parser: 0.12.1
       regex: 6.0.1
       regex-recursion: 6.0.2
+
+  openai@6.6.0(ws@8.18.3)(zod@4.1.12):
+    optionalDependencies:
+      ws: 8.18.3
+      zod: 4.1.12
 
   optionator@0.9.4:
     dependencies:
