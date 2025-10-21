@@ -1,4 +1,4 @@
-import { executePRTriagePipeline } from "@/ai/tools/pipelines/pr-triage";
+import { executePRTriagePipeline } from "@/ai/pipelines/pr-triage";
 import { createTriggerLogger } from "@/lib/logger";
 import { task, logger as triggerLogger } from "@trigger.dev/sdk/v3";
 import "dotenv/config";

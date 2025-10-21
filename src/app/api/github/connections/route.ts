@@ -1,8 +1,9 @@
 import { getUser } from "@/echo";
 import { prisma } from "@/lib/db";
 import { normalizePrivateKey } from "@/lib/github";
-import { App } from "@octokit/app";
+import { createAppAuth } from "@octokit/auth-app";
 import { NextResponse } from "next/server";
+import { Octokit } from "octokit";
 
 type RepoMeta = {
   id: number;
@@ -47,11 +48,6 @@ export async function GET() {
       return NextResponse.json({ connections: [] });
     }
 
-    const app = new App({
-      appId: process.env.GITHUB_APP_ID!,
-      privateKey: normalizePrivateKey(process.env.GITHUB_APP_PRIVATE_KEY!),
-    });
-
     const connections: Array<{
       installation_id: number;
       account_login?: string | null;
@@ -61,9 +57,16 @@ export async function GET() {
 
     for (const inst of installs) {
       try {
-        const octokit = await app.getInstallationOctokit(
-          Number(inst.installationId),
-        );
+        const octokit = new Octokit({
+          authStrategy: createAppAuth,
+          auth: {
+            appId: process.env.GITHUB_APP_ID!,
+            privateKey: normalizePrivateKey(
+              process.env.GITHUB_APP_PRIVATE_KEY!,
+            ),
+            installationId: Number(inst.installationId),
+          },
+        });
 
         // List repositories accessible to the installation
         const repos: RepoMeta[] = [];

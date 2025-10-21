@@ -1,4 +1,5 @@
-import { App } from "@octokit/app";
+import { createAppAuth } from "@octokit/auth-app";
+import { Octokit } from "octokit";
 
 export function getEnv(name: string, required = true): string | undefined {
   const value = process.env[name];
@@ -23,12 +24,16 @@ export async function getInstallationTokenForRepo(
   owner: string,
   repo: string,
 ): Promise<string> {
-  const app = new App({
-    appId: getEnv("GITHUB_APP_ID")!,
-    privateKey: normalizePrivateKey(getEnv("GITHUB_APP_PRIVATE_KEY")!),
+  const octokit = new Octokit({
+    authStrategy: createAppAuth,
+    auth: {
+      appId: getEnv("GITHUB_APP_ID")!,
+      privateKey: normalizePrivateKey(getEnv("GITHUB_APP_PRIVATE_KEY")!),
+    },
   });
+
   // Get installation for the repo
-  const installation = await app.octokit.request(
+  const installation = await octokit.request(
     "GET /repos/{owner}/{repo}/installation",
     {
       owner,
@@ -37,7 +42,7 @@ export async function getInstallationTokenForRepo(
   );
 
   // Create installation access token
-  const tokenResponse = await app.octokit.request(
+  const tokenResponse = await octokit.request(
     "POST /app/installations/{installation_id}/access_tokens",
     {
       installation_id: installation.data.id,

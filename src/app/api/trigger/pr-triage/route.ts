@@ -1,4 +1,4 @@
-import { executePRTriagePipeline } from "@/ai/tools/pipelines/pr-triage";
+import { executePRTriagePipeline } from "@/ai/pipelines/pr-triage";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";

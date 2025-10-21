@@ -1,7 +1,8 @@
 import { verifyState } from "@/lib/crypto";
 import { prisma } from "@/lib/db";
 import { normalizePrivateKey } from "@/lib/github";
-import { App } from "@octokit/app";
+import { createAppAuth } from "@octokit/auth-app";
+import { Octokit } from "octokit";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
@@ -37,12 +38,15 @@ export async function GET(req: Request) {
     let accountId: number | null = null;
 
     try {
-      const app = new App({
-        appId: process.env.GITHUB_APP_ID!,
-        privateKey: normalizePrivateKey(process.env.GITHUB_APP_PRIVATE_KEY!),
+      const octokit = new Octokit({
+        authStrategy: createAppAuth,
+        auth: {
+          appId: process.env.GITHUB_APP_ID!,
+          privateKey: normalizePrivateKey(process.env.GITHUB_APP_PRIVATE_KEY!),
+        },
       });
 
-      const installationResp = await app.octokit.request(
+      const installationResp = await octokit.request(
         "GET /app/installations/{installation_id}",
         { installation_id: Number(installationId) },
       );

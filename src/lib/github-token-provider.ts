@@ -1,4 +1,5 @@
-import { App } from "@octokit/app";
+import { createAppAuth } from "@octokit/auth-app";
+import { Octokit } from "octokit";
 import { prisma } from "./db";
 import { getEnv, normalizePrivateKey } from "./github";
 
@@ -29,14 +30,17 @@ export async function getGitHubInstallationToken(
     );
   }
 
-  // Create GitHub App instance
-  const app = new App({
-    appId: getEnv("GITHUB_APP_ID")!,
-    privateKey: normalizePrivateKey(getEnv("GITHUB_APP_PRIVATE_KEY")!),
+  // Create Octokit instance with App authentication
+  const octokit = new Octokit({
+    authStrategy: createAppAuth,
+    auth: {
+      appId: getEnv("GITHUB_APP_ID")!,
+      privateKey: normalizePrivateKey(getEnv("GITHUB_APP_PRIVATE_KEY")!),
+    },
   });
 
   // Generate a fresh installation access token
-  const tokenResponse = await app.octokit.request(
+  const tokenResponse = await octokit.request(
     "POST /app/installations/{installation_id}/access_tokens",
     {
       installation_id: Number(installation.installationId),
