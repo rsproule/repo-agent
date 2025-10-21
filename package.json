@@ -10,7 +10,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "test:pr-triage": "node test-pr-triage.mjs"
   },
   "dependencies": {
     "@ai-sdk-tools/store": "^0.8.2",
@@ -48,6 +49,7 @@
     "jose": "^6.1.0",
     "lucide-react": "^0.543.0",
     "nanoid": "^5.1.6",
+    "neverthrow": "^8.2.0",
     "next": "15.5.2",
     "pg": "^8.16.3",
     "react": "19.1.0",
@@ -58,6 +60,7 @@
     "tailwind-merge": "^3.3.1",
     "tokenlens": "^1.3.1",
     "use-stick-to-bottom": "^1.1.1",
+    "winston": "^3.18.3",
     "zod": "^4.1.12"
   },
   "devDependencies": {
@@ -69,6 +72,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-syntax-highlighter": "^15.5.13",
+    "@types/winston": "^2.4.4",
     "eslint": "^9",
     "eslint-config-next": "15.5.2",
     "prisma": "^6.17.1",

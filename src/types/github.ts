@@ -21,6 +21,38 @@ export type PullRequest = {
   body?: string;
 };
 
+export type PRFile = {
+  filename: string;
+  status: "added" | "removed" | "modified" | "renamed";
+  additions: number;
+  deletions: number;
+  changes: number;
+  patch?: string; // The actual diff
+  blob_url: string;
+};
+
+export type PRAnalysis = {
+  summary: string;
+  relevance: "high" | "medium" | "low";
+  category: string;
+  impact: {
+    scope: string[];
+    risk: "high" | "medium" | "low";
+  };
+  filesChanged: {
+    total: number;
+    additions: number;
+    deletions: number;
+    keyFiles: string[];
+  };
+  recommendations: string[];
+  aiGenerated: {
+    probability: number; // 0-100
+    confidence: "high" | "medium" | "low";
+    reasoning: string;
+  };
+};
+
 // For our connections API response
 export type GitHubConnection = {
   installation_id: number;

@@ -22,3 +22,52 @@ model GithubInstallation {
   @@index([echoUserId])
   @@map("github_installations")
 }
+
+model PullRequestRecord {
+  owner             String    @map("owner")
+  repo              String    @map("repo")
+  prNumber          Int       @map("pr_number")
+  prId              BigInt    @map("pr_id")
+  title             String
+  author            String
+  state             String
+  htmlUrl           String    @map("html_url")
+  body              String?
+  prCreatedAt       DateTime  @map("pr_created_at")
+  prUpdatedAt       DateTime  @map("pr_updated_at")
+  mergedAt          DateTime? @map("merged_at")
+  filesChangedCount Int?      @map("files_changed_count")
+  lastAnalyzedAt    DateTime? @map("last_analyzed_at")
+  echoUserId        String    @map("echo_user_id")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  analysis PRAnalysisRecord?
+
+  @@id([owner, repo, prNumber])
+  @@index([owner, repo])
+  @@index([echoUserId])
+  @@index([state])
+  @@map("pull_requests")
+}
+
+model PRAnalysisRecord {
+  owner           String   @map("owner")
+  repo            String   @map("repo")
+  prNumber        Int      @map("pr_number")
+  summary         String
+  relevance       String
+  category        String
+  impact          Json
+  filesChanged    Json     @map("files_changed")
+  recommendations Json
+  aiGenerated     Json?    @map("ai_generated")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+
+  pullRequest PullRequestRecord @relation(fields: [owner, repo, prNumber], references: [owner, repo, prNumber], onDelete: Cascade)
+
+  @@id([owner, repo, prNumber])
+  @@index([relevance])
+  @@map("pr_analyses")
+}

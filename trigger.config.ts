@@ -1,4 +1,5 @@
 import { defineConfig } from "@trigger.dev/sdk/v3";
+import "dotenv/config";
 
 export default defineConfig({
   project: "proj_yjjmvjpsxdfqifkjirrw",
