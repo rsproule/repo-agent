@@ -61,6 +61,7 @@ export const PrGraph: React.FC<Props> = ({
     },
   );
 
+
   // Find the bucket for a given x-axis date string
   const findBucketByDate = useCallback(
     (chartData: ChartDataPoint[]) => (key: number) => {
@@ -159,23 +160,25 @@ export const PrGraph: React.FC<Props> = ({
 
   const isSelected = useCallback(
     (point: ChartDataPoint) => {
-      if (!dragRangeStart || !dragRangeEnd) {
-        return (
-          minTime.getTime() !== maxTime.getTime() &&
-          ((point.startDate >= minTime && point.endDate <= maxTime) ||
-            (minTime >= point.startDate && minTime <= point.endDate) ||
-            (maxTime >= point.startDate && maxTime <= point.endDate))
-        );
+      if (dragRangeStart && dragRangeEnd) {
+        // During drag, use drag range
+        const [start, end] = getSortedDragRange();
+        if (!start || !end) return false;
+        return point.startDate <= end && point.endDate >= start;
       }
 
-      const [start, end] = getSortedDragRange();
-      if (!start || !end) return false;
-      // Check if bucket overlaps with drag range
-      const bucketStart = point.startDate;
-      const bucketEnd = point.endDate;
-      return bucketStart <= end && bucketEnd >= start;
+      // When not dragging, check if we have a meaningful time range selected
+      const timeRange = selectedTimeRangeOption !== TimeRangeOptions.Custom
+        || minTime.getTime() !== maxTime.getTime()
+        ? { min_time: minTime, max_time: maxTime }
+        : null;
+
+      if (!timeRange) return false;
+
+      // Check if bucket overlaps with selected time range
+      return point.startDate <= timeRange.max_time && point.endDate >= timeRange.min_time;
     },
-    [minTime, maxTime, getSortedDragRange, dragRangeStart, dragRangeEnd],
+    [minTime, maxTime, getSortedDragRange, dragRangeStart, dragRangeEnd, selectedTimeRangeOption],
   );
 
   const handleSelectedTimeRangeOptionChange = (
@@ -220,10 +223,8 @@ export const PrGraph: React.FC<Props> = ({
     >
       <div className="flex flex-col md:flex-row justify-between items-start gap-2">
         <PrCountBanner
-          prAggregation={{
-            data: prData,
-            isLoading,
-          }}
+          prData={prData}
+          isLoading={isLoading}
           timeRange={{
             min_time: minTime,
             max_time: maxTime,
@@ -249,7 +250,7 @@ export const PrGraph: React.FC<Props> = ({
       <TimeRangeFilterChart
         repo={repo}
         data={{
-          data: prData,
+          data: prData || null,
           isLoading,
         }}
         isSelected={isSelected}

@@ -1,6 +1,7 @@
 import React from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { HStack } from "@/components/ui/stack";
 import { TimeRangeOptions } from "./time-range-options";
 import { cn } from "@/lib/utils";
 
@@ -21,29 +22,28 @@ export const TimeRangeButtons: React.FC<Props> = ({
   containerClassName,
 }) => {
   return (
-    <div className={cn("flex gap-1", containerClassName)}>
+    <HStack className={cn("gap-1", containerClassName)}>
       {Object.values(TimeRangeOptions).map((option) => (
         <Button
           key={option}
           variant={
-            selectedTimeRangeOption === option ? "default" : "outline"
+            selectedTimeRangeOption === option ? "outline" : "ghost"
           }
           onClick={() => setSelectedTimeRangeOption(option)}
-          size="sm"
+          size="xs"
           className={cn(
             "text-xs border",
-            selectedTimeRangeOption !== option && "border-gray-300 text-gray-600 bg-white hover:bg-gray-50",
-            selectedTimeRangeOption === option && "bg-blue-100 text-blue-700 border-blue-300"
+            selectedTimeRangeOption !== option && "border-transparent",
           )}
         >
           {option === TimeRangeOptions.Custom &&
           selectedTimeRangeOption === option
-            ? timeRange.max_time === timeRange.min_time
+            ? timeRange.max_time.getTime() === timeRange.min_time.getTime()
               ? "Drag to Select"
               : `${format(timeRange.min_time, "M/d/yy")} - ${format(timeRange.max_time, "M/d/yy")}`
             : option}
         </Button>
       ))}
-    </div>
+    </HStack>
   );
 };

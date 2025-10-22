@@ -9,7 +9,7 @@ interface Repository {
   name: string;
 }
 
-interface UserRepoSearchResult {
+interface UserFilter {
   id: number;
   login: string;
   avatar_url: string;
@@ -19,8 +19,8 @@ interface Props {
   repo: Repository;
   minTime: string;
   maxTime: string;
-  filterUser: UserRepoSearchResult | undefined;
-  setFilterUser: (user: UserRepoSearchResult | undefined) => void;
+  filterUser: UserFilter | undefined;
+  setFilterUser: (user: UserFilter | undefined) => void;
 }
 
 export const Contributors: React.FC<Props> = ({

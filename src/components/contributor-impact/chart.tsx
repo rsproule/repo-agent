@@ -28,7 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { HStack, VStack } from "@/components/ui/stack";
 import { useAttributionQuartiles } from "@/hooks/use-attribution";
 import { cn } from "@/lib/utils";
-import type { PrAggregationResponse } from "@/types/api";
+import type { PrAggregationResponse } from "@/hooks/use-attribution";
 import type { LoadingData } from "@/types/loading-data";
 import type { Repository } from "@/types/repository";
 import { GitPullRequest, Loader2 } from "lucide-react";
@@ -216,7 +216,9 @@ const TimeRangeFilterChartBody: React.FC<ChartProps> = ({
 
   const getBarColor = useCallback(
     (entry: ChartDataPoint) => {
-      return isSelected(entry) ? "var(--primary)" : "var(--primary-15)";
+      return isSelected(entry)
+        ? "oklch(0.6483 0.124 226.05)"
+        : "color-mix(in srgb, oklch(0.6483 0.124 226.05) 15%, transparent)";
     },
     [isSelected],
   );
@@ -335,7 +337,7 @@ const TooltipContent: React.FC<TooltipContentProps> = ({
     },
   );
 
-  const countRef = useRef<number>();
+  const countRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (quartiles) {

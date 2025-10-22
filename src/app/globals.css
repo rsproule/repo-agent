@@ -66,19 +66,35 @@
   }
 
   .bg-primary-15 {
-    background-color: var(--primary-15);
+    background-color: color-mix(in srgb, oklch(0.6483 0.124 226.05) 15%, transparent);
   }
 
   .bg-primary-30 {
-    background-color: var(--primary-30);
+    background-color: color-mix(in srgb, oklch(0.6483 0.124 226.05) 30%, transparent);
   }
 
   .bg-primary-60 {
-    background-color: var(--primary-60);
+    background-color: color-mix(in srgb, oklch(0.6483 0.124 226.05) 60%, transparent);
   }
 
   .bg-primary-100 {
-    background-color: var(--primary-100);
+    background-color: oklch(0.6483 0.124 226.05);
+  }
+
+  .dark .bg-primary-15 {
+    background-color: color-mix(in srgb, oklch(0.6293 0.109 210.87) 15%, transparent);
+  }
+
+  .dark .bg-primary-30 {
+    background-color: color-mix(in srgb, oklch(0.6293 0.109 210.87) 30%, transparent);
+  }
+
+  .dark .bg-primary-60 {
+    background-color: color-mix(in srgb, oklch(0.6293 0.109 210.87) 60%, transparent);
+  }
+
+  .dark .bg-primary-100 {
+    background-color: oklch(0.6293 0.109 210.87);
   }
 }
 

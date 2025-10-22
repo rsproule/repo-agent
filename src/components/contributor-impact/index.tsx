@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import { GitPullRequest } from "lucide-react";
-import { startOfDay } from "date-fns";
 import { PrGraph } from "./pr-graph";
 import { Contributors } from "./contributors";
 import { TopPrs } from "../prs";
@@ -13,7 +12,7 @@ interface Repository {
   created_at?: string;
 }
 
-interface UserRepoSearchResult {
+interface UserFilter {
   id: number;
   login: string;
   avatar_url: string;
@@ -52,14 +51,15 @@ const ContributorImpactBody: React.FC<{
     return new Date();
   });
 
-  const [minTime, setMinTime] = useState(
-    repo.created_at
-      ? startOfDay(new Date(repo.created_at))
-      : startOfDay(new Date()),
-  );
+  const [minTime, setMinTime] = useState(() => {
+    // Start with repo creation date or 30 days ago if no creation date
+    return repo.created_at
+      ? new Date(repo.created_at)
+      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  });
 
   const [filterUser, setFilterUser] = useState<
-    UserRepoSearchResult | undefined
+    UserFilter | undefined
   >(undefined);
 
   return (
@@ -83,8 +83,18 @@ const ContributorImpactBody: React.FC<{
           repo={{ ...repo, id: 1 }}
           minTime={minTime.toISOString()}
           maxTime={maxTime.toISOString()}
-          filterUser={filterUser}
-          setFilterUser={setFilterUser}
+          filterUser={filterUser ? {
+            id: filterUser.id.toString(),
+            login: filterUser.login,
+            avatar_url: filterUser.avatar_url,
+            total_prs: 0,
+            merged_prs: 0,
+          } : undefined}
+          setFilterUser={(user) => setFilterUser(user ? {
+            id: typeof user.id === 'string' ? parseInt(user.id) : user.id,
+            login: user.login,
+            avatar_url: user.avatar_url,
+          } : undefined)}
         />
       </div>
     </div>

@@ -21,10 +21,10 @@ interface PullRequest {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { prId: string } }
+  { params }: { params: Promise<{ prId: string }> }
 ) {
   try {
-    const { prId } = params;
+    const { prId } = await params;
 
     if (!prId) {
       return NextResponse.json(

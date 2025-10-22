@@ -112,8 +112,8 @@ export const PrList: React.FC<Props> = ({
                 >
                   {prs.pages
                     .flatMap((page) => page.items)
-                    .map((pr) => (
-                      <PrRow key={pr.prId} repo={repo} pr={pr} showModal />
+                    .map((pr, index) => (
+                      <PrRow key={`${pr.prId}-${pr.userId}-${index}`} repo={repo} pr={pr} showModal />
                     ))}
                   {isFetchingNextPage &&
                     Array.from({ length: NUM_PRS_TO_SHOW }).map((_, index) => (
