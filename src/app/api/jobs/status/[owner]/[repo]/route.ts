@@ -21,7 +21,7 @@ interface TriggerRun {
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<Params> }
+  { params }: { params: Promise<Params> },
 ) {
   try {
     const user = await getUser();
@@ -34,7 +34,7 @@ export async function GET(
     if (!owner || !repo) {
       return NextResponse.json(
         { error: "owner and repo are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -46,31 +46,28 @@ export async function GET(
         status: ["WAITING_FOR_DEPLOY", "QUEUED", "EXECUTING", "REATTEMPTING"],
       });
 
-
-      // Filter runs that are sync/bucket related (temporarily ignore repo matching)
+      // Filter runs that are sync/bucket related - ONLY match if we can verify the repo
       const relevantRuns = recentRuns.data.filter((run) => {
         const triggerRun = run as TriggerRun;
         const taskId = triggerRun.taskIdentifier;
-        const isRelevantTask = taskId === 'sync-prs' ||
-                              taskId === 'bucket-prs' ||
-                              taskId === 'sync-and-bucket-prs';
+        const isRelevantTask =
+          taskId === "sync-prs" ||
+          taskId === "bucket-prs" ||
+          taskId === "sync-and-bucket-prs";
 
-        // For now, accept any sync/bucket task since payload matching is unreliable
-        // TODO: Improve repo matching when we understand Trigger.dev v3 payload structure better
+        if (!isRelevantTask) return false;
+
         const payload = triggerRun.payload;
-        if (payload) {
-          const runRepo = `${payload?.owner}/${payload?.repo}`;
+        if (payload && payload.owner && payload.repo) {
+          const runRepo = `${payload.owner}/${payload.repo}`;
           const isRepoMatch = runRepo === repository;
-
-          // If we have payload, use exact matching
-          return isRelevantTask && isRepoMatch;
-        } else {
-
-          // If no payload, just match by task type (less precise but better than nothing)
-          return isRelevantTask;
+          return isRepoMatch;
         }
-      });
 
+        // If no payload or missing owner/repo, we can't verify this is for the right repo
+        // Return false to avoid showing jobs from other repos
+        return false;
+      });
 
       const isRunning = relevantRuns.length > 0;
 
@@ -85,65 +82,89 @@ export async function GET(
         if (!payload) return false;
         const runRepo = `${payload?.owner}/${payload?.repo}`;
         const taskId = triggerRun.taskIdentifier;
-        return runRepo === repository &&
-               (taskId === 'sync-prs' ||
-                taskId === 'bucket-prs' ||
-                taskId === 'sync-and-bucket-prs');
+        return (
+          runRepo === repository &&
+          (taskId === "sync-prs" ||
+            taskId === "bucket-prs" ||
+            taskId === "sync-and-bucket-prs")
+        );
       });
 
       const latestCompletedRun = recentCompletedRuns[0];
 
       // Determine data freshness
-      let dataFreshness: 'fresh' | 'stale' | 'unknown' = 'unknown';
+      let dataFreshness: "fresh" | "stale" | "unknown" = "unknown";
 
       if (isRunning) {
-        dataFreshness = 'fresh'; // Data is being updated
-      } else if (latestCompletedRun && (latestCompletedRun as TriggerRun).completedAt) {
-        const hoursSinceCompletion = (Date.now() - (latestCompletedRun as TriggerRun).completedAt!.getTime()) / (1000 * 60 * 60);
-        dataFreshness = hoursSinceCompletion < 24 ? 'fresh' : 'stale';
+        dataFreshness = "fresh"; // Data is being updated
+      } else if (
+        latestCompletedRun &&
+        (latestCompletedRun as TriggerRun).completedAt
+      ) {
+        const hoursSinceCompletion =
+          (Date.now() -
+            (latestCompletedRun as TriggerRun).completedAt!.getTime()) /
+          (1000 * 60 * 60);
+        dataFreshness = hoursSinceCompletion < 24 ? "fresh" : "stale";
       }
 
-      const currentJobs = relevantRuns.map(run => {
+      const currentJobs = relevantRuns.map((run) => {
         const triggerRun = run as TriggerRun;
         return {
           id: run.id,
-          jobType: triggerRun.taskIdentifier as 'sync-prs' | 'bucket-prs' | 'sync-and-bucket-prs',
-          status: run.status.toLowerCase() as 'waiting' | 'queued' | 'executing' | 'completed' | 'failed',
-          startedAt: triggerRun.createdAt?.toISOString() || new Date().toISOString(),
-          progress: run.status === 'EXECUTING' ? { current: 1, total: 1, stage: 'processing' } : undefined,
+          jobType: triggerRun.taskIdentifier as
+            | "sync-prs"
+            | "bucket-prs"
+            | "sync-and-bucket-prs",
+          status: run.status.toLowerCase() as
+            | "waiting"
+            | "queued"
+            | "executing"
+            | "completed"
+            | "failed",
+          startedAt:
+            triggerRun.createdAt?.toISOString() || new Date().toISOString(),
+          progress:
+            run.status === "EXECUTING"
+              ? { current: 1, total: 1, stage: "processing" }
+              : undefined,
         };
       });
 
       const response = {
         currentJobs,
         isRunning,
-        lastSuccessfulSync: (latestCompletedRun as TriggerRun)?.completedAt?.toISOString(),
+        lastSuccessfulSync: (
+          latestCompletedRun as TriggerRun
+        )?.completedAt?.toISOString(),
         dataFreshness,
-        latestJobStatus: latestCompletedRun?.status?.toLowerCase() || null
+        latestJobStatus: latestCompletedRun?.status?.toLowerCase() || null,
       };
-
 
       return NextResponse.json(response);
     } catch (triggerError) {
-      console.warn("Failed to fetch Trigger.dev runs, returning basic status:", triggerError);
+      console.warn(
+        "Failed to fetch Trigger.dev runs, returning basic status:",
+        triggerError,
+      );
 
       // Fallback: return basic status without Trigger.dev integration
       return NextResponse.json({
         currentJobs: [],
         isRunning: false,
         lastSuccessfulSync: undefined,
-        dataFreshness: 'unknown' as const,
-        latestJobStatus: null
+        dataFreshness: "unknown" as const,
+        latestJobStatus: null,
       });
     }
-
   } catch (error) {
     console.error("Job status error:", error);
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Failed to get job status",
+        error:
+          error instanceof Error ? error.message : "Failed to get job status",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -1,6 +1,7 @@
 import { syncRepoPRs } from "@/ai/tools/sync-prs";
 import { prisma } from "@/lib/db";
 import { getInstallationTokenForUser } from "@/lib/github";
+import { JobTracker } from "@/lib/job-tracker";
 import { defaultLogger, type Logger } from "@/lib/logger";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
@@ -13,7 +14,6 @@ const openai = createOpenAI({
 });
 
 export const BUCKET_CLASSIFIER_VERSION = "v0.0.1";
-const DEFAULT_MODEL = "gpt-4o-2024-11-20";
 const NUM_PARALLEL_PR_PROCESSING = 10; // Process PRs in batches
 const MAX_TOKENS_BEFORE_TRUNCATION = 100_000; // Max tokens per request
 
@@ -242,33 +242,54 @@ export async function bucketPRs(
 
   logger.info("Starting PR bucketing", { owner, repo, fullResync });
 
-  // Step 1: Sync PRs first
-  logger.info("Syncing PRs from GitHub...");
-  const syncResult = await syncRepoPRs(
-    {
-      owner,
-      repo,
-      echoUserId,
-      pageSize: 100,
-      requestDelayMs: 0,
-    },
+  // Check for existing running job (idempotency)
+  const jobTracker = new JobTracker(
+    owner,
+    repo,
+    "bucket_prs",
+    echoUserId,
     logger,
   );
+  const { jobId, isNew } = await jobTracker.start({ fullResync });
 
-  if (syncResult.isErr()) {
+  if (!isNew) {
+    logger.info("Bucket job already running, returning existing job", {
+      jobId,
+    });
+    // Return a placeholder result - the existing job will complete
     throw new Error(
-      `Failed to sync PRs: ${syncResult.error.type} - ${syncResult.error.cause.message}`,
+      `Bucket job already running for ${owner}/${repo}. Please wait for it to complete.`,
     );
   }
 
-  logger.info("PR sync complete", {
-    totalSynced: syncResult.value.totalSynced,
-  });
+  try {
+    // Step 1: Sync PRs first
+    logger.info("Syncing PRs from GitHub...");
+    const syncResult = await syncRepoPRs(
+      {
+        owner,
+        repo,
+        echoUserId,
+        pageSize: 100,
+        requestDelayMs: 0,
+      },
+      logger,
+    );
 
-  // Step 2: Get merged PR range
-  const prRange = await prisma.$queryRaw<
-    Array<{ min: number; max: number; count: bigint }>
-  >`
+    if (syncResult.isErr()) {
+      throw new Error(
+        `Failed to sync PRs: ${syncResult.error.type} - ${syncResult.error.cause.message}`,
+      );
+    }
+
+    logger.info("PR sync complete", {
+      totalSynced: syncResult.value.totalSynced,
+    });
+
+    // Step 2: Get merged PR range
+    const prRange = await prisma.$queryRaw<
+      Array<{ min: number; max: number; count: bigint }>
+    >`
     SELECT
       MIN(pr_number) as min,
       MAX(pr_number) as max,
@@ -280,213 +301,223 @@ export async function bucketPRs(
       AND merged_at IS NOT NULL
   `;
 
-  if (!prRange[0] || !prRange[0].min || !prRange[0].max) {
-    throw new Error(`No merged PRs found for repository ${owner}/${repo}`);
-  }
+    if (!prRange[0] || !prRange[0].min || !prRange[0].max) {
+      throw new Error(`No merged PRs found for repository ${owner}/${repo}`);
+    }
 
-  const lowestPR = prRange[0].min;
-  const highestPR = prRange[0].max;
-  const prCount = Number(prRange[0].count);
+    const lowestPR = prRange[0].min;
+    const highestPR = prRange[0].max;
+    const prCount = Number(prRange[0].count);
 
-  logger.info("PR range determined", { lowestPR, highestPR, prCount });
+    logger.info("PR range determined", { lowestPR, highestPR, prCount });
 
-  // Step 3: Create classification run
-  const classificationRun = await prisma.prBucketClassificationRun.create({
-    data: {
-      owner,
-      repo,
-      lowestPrNumber: lowestPR,
-      highestPrNumber: highestPR,
-      prCount,
-      version: BUCKET_CLASSIFIER_VERSION,
-      model: DEFAULT_MODEL,
-    },
-  });
+    // Step 3: Create classification run
+    const classificationRun = await prisma.prBucketClassificationRun.create({
+      data: {
+        owner,
+        repo,
+        lowestPrNumber: lowestPR,
+        highestPrNumber: highestPR,
+        prCount,
+        version: BUCKET_CLASSIFIER_VERSION,
+        model: "gpt-4o-mini",
+      },
+    });
 
-  logger.info("Created classification run", { runId: classificationRun.runId });
+    logger.info("Created classification run", {
+      runId: classificationRun.runId,
+    });
 
-  // Step 4: Get GitHub token and initialize Octokit
-  const token = await getInstallationTokenForUser(echoUserId);
-  const octokit = new Octokit({ auth: token });
+    // Step 4: Get GitHub token and initialize Octokit
+    const token = await getInstallationTokenForUser(echoUserId);
+    const octokit = new Octokit({ auth: token });
 
-  let totalCost = 0;
-  let totalProcessed = 0;
+    let totalCost = 0;
+    let totalProcessed = 0;
 
-  // Step 6: Process PRs in batches
-  let skip = 0;
-  const batchSize = NUM_PARALLEL_PR_PROCESSING;
+    // Step 6: Process PRs in batches
+    let skip = 0;
+    const batchSize = NUM_PARALLEL_PR_PROCESSING;
 
-  while (true) {
-    // Get next batch of PRs
-    const whereClause: {
-      owner: string;
-      repo: string;
-      state: string;
-      mergedAt: { not: null };
-      prNumber?: { gt: number };
-      AND?: unknown;
-    } = {
-      owner,
-      repo,
-      state: "closed",
-      mergedAt: { not: null },
-    };
-
-    // If not full resync, exclude already classified PRs
-    if (!fullResync) {
-      whereClause.AND = {
-        NOT: {
-          buckets: {
-            some: {},
-          },
-        },
+    while (true) {
+      // Get next batch of PRs
+      const whereClause: {
+        owner: string;
+        repo: string;
+        state: string;
+        mergedAt: { not: null };
+        prNumber?: { gt: number };
+        buckets?: { none: {} };
+      } = {
+        owner,
+        repo,
+        state: "closed",
+        mergedAt: { not: null },
       };
-    }
 
-    const prs = await prisma.pullRequestRecord.findMany({
-      where: whereClause,
-      take: batchSize,
-      skip,
-      orderBy: { prNumber: "asc" },
-    });
-
-    if (prs.length === 0) {
-      break;
-    }
-
-    logger.info(`Processing batch of ${prs.length} PRs`, {
-      skip,
-      total: totalProcessed,
-    });
-
-    // Process PRs in parallel
-    const results = await Promise.allSettled(
-      prs.map((pr) => processSinglePR(pr, owner, repo, octokit, logger)),
-    );
-
-    // Collect successful results
-    const bucketEntries = [];
-    let batchCost = 0;
-
-    for (let i = 0; i < results.length; i++) {
-      const result = results[i];
-      const pr = prs[i];
-
-      if (result.status === "fulfilled") {
-        const { bucket, usage } = result.value;
-        batchCost += usage.cost;
-
-        bucketEntries.push({
-          runId: classificationRun.runId,
-          owner,
-          repo,
-          prNumber: pr.prNumber,
-          prId: pr.prId,
-          bucket,
-          additions: null, // Will be updated from file data if available
-          deletions: null,
-          changedFiles: null,
-        });
-      } else {
-        logger.error(`Failed to process PR #${pr.prNumber}`, {
-          error: result.reason,
-        });
+      // If not full resync, exclude already classified PRs
+      if (!fullResync) {
+        whereClause.buckets = { none: {} };
       }
-    }
 
-    // Batch insert classifications
-    if (bucketEntries.length > 0) {
-      // Get author info for the PRs FIRST
-      const prNumbers = bucketEntries.map((e) => e.prNumber);
-      const prAuthors = await prisma.pullRequestRecord.findMany({
-        where: {
-          owner,
-          repo,
-          prNumber: { in: prNumbers },
-        },
-        select: {
-          prNumber: true,
-          author: true,
-        },
+      const prs = await prisma.pullRequestRecord.findMany({
+        where: whereClause,
+        take: batchSize,
+        skip,
+        orderBy: { prNumber: "asc" },
       });
 
-      const authorMap = new Map(
-        prAuthors.map((pr) => [pr.prNumber, pr.author]),
+      if (prs.length === 0) {
+        break;
+      }
+
+      logger.info(`Processing batch of ${prs.length} PRs`, {
+        skip,
+        total: totalProcessed,
+      });
+
+      // Process PRs in parallel
+      const results = await Promise.allSettled(
+        prs.map((pr) => processSinglePR(pr, owner, repo, octokit, logger)),
       );
 
-      // Create scores from buckets
-      // Bucket → Score mapping: 0→-2.0, 1→-1.0, 2→1.0, 3→2.0
-      const scoreEntries = bucketEntries.map((entry) => {
-        const score =
-          entry.bucket === 0
-            ? -2.0
-            : entry.bucket === 1
-            ? -1.0
-            : entry.bucket === 2
-            ? 1.0
-            : 2.0;
+      // Collect successful results
+      const bucketEntries = [];
+      let batchCost = 0;
 
-        return {
-          prId: entry.prId,
-          owner: entry.owner,
-          repo: entry.repo,
-          prNumber: entry.prNumber,
-          author: authorMap.get(entry.prNumber) || "unknown",
-          authorGithubId: null,
-          bucket: entry.bucket,
-          score,
-          initRunId: classificationRun.runId,
-          initVersion: "bts1.0",
-          updaterVersion: null,
-        };
-      });
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i];
+        const pr = prs[i];
 
-      // Insert both buckets AND scores in single transaction to ensure atomicity
-      await prisma.$transaction([
-        prisma.prBucket.createMany({
-          data: bucketEntries,
-          skipDuplicates: true,
-        }),
-        prisma.prScore.createMany({
-          data: scoreEntries,
-          skipDuplicates: true,
-        }),
-      ]);
+        if (result.status === "fulfilled") {
+          const { bucket, usage } = result.value;
+          batchCost += usage.cost;
 
-      totalCost += batchCost;
-      totalProcessed += bucketEntries.length;
+          bucketEntries.push({
+            runId: classificationRun.runId,
+            owner,
+            repo,
+            prNumber: pr.prNumber,
+            prId: pr.prId,
+            bucket,
+            additions: null, // Will be updated from file data if available
+            deletions: null,
+            changedFiles: null,
+          });
+        } else {
+          logger.error(`Failed to process PR #${pr.prNumber}`, {
+            error: result.reason,
+          });
+        }
+      }
 
-      logger.info("Batch complete", {
-        processed: bucketEntries.length,
-        scores: scoreEntries.length,
-        batchCost: batchCost.toFixed(4),
-        totalCost: totalCost.toFixed(4),
-      });
+      // Batch insert classifications
+      if (bucketEntries.length > 0) {
+        // Get author info for the PRs FIRST
+        const prNumbers = bucketEntries.map((e) => e.prNumber);
+        const prAuthors = await prisma.pullRequestRecord.findMany({
+          where: {
+            owner,
+            repo,
+            prNumber: { in: prNumbers },
+          },
+          select: {
+            prNumber: true,
+            author: true,
+          },
+        });
+
+        const authorMap = new Map(
+          prAuthors.map((pr) => [pr.prNumber, pr.author]),
+        );
+
+        // Create scores from buckets
+        // Bucket → Score mapping: 0→-2.0, 1→-1.0, 2→1.0, 3→2.0
+        const scoreEntries = bucketEntries.map((entry) => {
+          const score =
+            entry.bucket === 0
+              ? -2.0
+              : entry.bucket === 1
+              ? -1.0
+              : entry.bucket === 2
+              ? 1.0
+              : 2.0;
+
+          return {
+            prId: entry.prId,
+            owner: entry.owner,
+            repo: entry.repo,
+            prNumber: entry.prNumber,
+            author: authorMap.get(entry.prNumber) || "unknown",
+            authorGithubId: null,
+            bucket: entry.bucket,
+            score,
+            initRunId: classificationRun.runId,
+            initVersion: "bts1.0",
+            updaterVersion: null,
+          };
+        });
+
+        // Insert both buckets AND scores in single transaction to ensure atomicity
+        await prisma.$transaction([
+          prisma.prBucket.createMany({
+            data: bucketEntries,
+            skipDuplicates: true,
+          }),
+          prisma.prScore.createMany({
+            data: scoreEntries,
+            skipDuplicates: true,
+          }),
+        ]);
+
+        totalCost += batchCost;
+        totalProcessed += bucketEntries.length;
+
+        logger.info("Batch complete", {
+          processed: bucketEntries.length,
+          scores: scoreEntries.length,
+          batchCost: batchCost.toFixed(4),
+          totalCost: totalCost.toFixed(4),
+        });
+      }
+
+      skip += batchSize;
     }
 
-    skip += batchSize;
-  }
+    // Step 7: Mark run as completed
+    await prisma.prBucketClassificationRun.update({
+      where: { runId: classificationRun.runId },
+      data: {
+        completedAt: new Date(),
+        totalCost,
+      },
+    });
 
-  // Step 7: Mark run as completed
-  await prisma.prBucketClassificationRun.update({
-    where: { runId: classificationRun.runId },
-    data: {
-      completedAt: new Date(),
+    logger.info("PR bucketing complete", {
+      totalProcessed,
+      totalCost: totalCost.toFixed(4),
+      runId: classificationRun.runId,
+    });
+
+    // Mark job as complete
+    await jobTracker.complete(jobId, {
+      totalProcessed,
       totalCost,
-    },
-  });
+      runId: classificationRun.runId,
+    });
 
-  logger.info("PR bucketing complete", {
-    totalProcessed,
-    totalCost: totalCost.toFixed(4),
-    runId: classificationRun.runId,
-  });
-
-  return {
-    totalProcessed,
-    totalCost,
-    runId: classificationRun.runId,
-  };
+    return {
+      totalProcessed,
+      totalCost,
+      runId: classificationRun.runId,
+    };
+  } catch (error) {
+    // Mark job as failed
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    await jobTracker.fail(jobId, errorMessage);
+    throw error;
+  }
 }
 
 // Define the schema for PR classification
@@ -532,8 +563,8 @@ async function processSinglePR(
 
   // Create user message
   let userMessage = formatPRUserMessage(
-    pr.title,
-    pr.body,
+    pr.title ?? null,
+    pr.body === undefined ? null : pr.body,
     pr.prNumber,
     diffData,
     filesSummary,
@@ -550,7 +581,7 @@ async function processSinglePR(
 
   // Call OpenAI through Echo SDK
   const result = await generateObject({
-    model: openai("gpt-4o-2024-11-20"),
+    model: openai("gpt-4o-mini"),
     schema: PRClassificationSchema,
     system: PR_CLASSIFICATION_SYSTEM_PROMPT,
     prompt: userMessage,

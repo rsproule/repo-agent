@@ -44,7 +44,7 @@ interface PaginatedResponse<T> {
 
 interface InfiniteData<T> {
   pages: T[];
-  pageParams: any[];
+  pageParams: unknown[];
 }
 
 interface Props {

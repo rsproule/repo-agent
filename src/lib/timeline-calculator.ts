@@ -12,9 +12,12 @@ interface PrScore {
  * This is done client-side for performance
  */
 export function calculateTimelineAttribution(
-  allScores: PrScore[],
+  allScores: PrScore[] | null,
   maxPrNumber: number,
 ): UserAttribution[] {
+  if (!allScores || allScores.length === 0) {
+    return [];
+  }
   // Filter to PRs up to maxPrNumber
   const relevantScores = allScores.filter((s) => s.prNumber <= maxPrNumber);
 

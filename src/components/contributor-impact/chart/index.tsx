@@ -1,16 +1,15 @@
 import React, {
   useMemo,
   useCallback,
-  useState,
   useEffect,
   useRef,
 } from "react";
 
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from "recharts";
+import type { CategoricalChartFunc } from "recharts/types/chart/generateCategoricalChart";
 import {
   format,
   addDays,
-  subMonths,
   differenceInDays,
   subYears,
   startOfDay,
@@ -51,9 +50,9 @@ interface Props {
   isSelected: (point: ChartDataPoint) => boolean;
   months: number;
   numBuckets?: number;
-  handleMouseDown?: (chartData: ChartDataPoint[]) => any;
-  handleMouseMove?: (chartData: ChartDataPoint[]) => any;
-  handleMouseUp?: (chartData: ChartDataPoint[]) => any;
+  handleMouseDown?: (chartData: ChartDataPoint[]) => CategoricalChartFunc;
+  handleMouseMove?: (chartData: ChartDataPoint[]) => CategoricalChartFunc;
+  handleMouseUp?: (chartData: ChartDataPoint[]) => CategoricalChartFunc;
   height?: number;
 }
 
@@ -108,7 +107,7 @@ interface ChartProps extends Omit<Props, "data"> {
 const TimeRangeFilterChartBody: React.FC<ChartProps> = ({
   repo,
   data,
-  months,
+  months: _months,
   numBuckets: numBucketsProp = 36,
   isSelected,
   handleMouseDown,

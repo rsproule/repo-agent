@@ -2,10 +2,13 @@
 
 import { ContributorsList } from "@/components/contributor-impact/contributors-list";
 import { Button } from "@/components/ui/button";
+import useJobStatus from "@/hooks/use-job-status";
 import { usePrRange } from "@/hooks/use-timeline-attribution";
+import { useTimelineReadiness } from "@/hooks/use-timeline-readiness";
 import type { PaginatedResponse, UserAttribution } from "@/lib/attribution";
 import { calculateTimelineAttribution } from "@/lib/timeline-calculator";
 import {
+  AlertCircle,
   ChevronsLeft,
   Download,
   Loader2,
@@ -13,6 +16,7 @@ import {
   Play,
   SkipBack,
   SkipForward,
+  Zap,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
@@ -34,6 +38,32 @@ const TimelinePage = React.memo(function TimelinePage() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(10); // 1x to 100x
   const [isPreloading, setIsPreloading] = useState(false);
+  const [justTriggered, setJustTriggered] = useState(false);
+
+  // Track bucket job status
+  const { isRunning: isBucketingRunning, bucketJob } = useJobStatus(
+    owner,
+    repo,
+    {
+      refreshInterval: 3000,
+    },
+  );
+
+  // Check timeline readiness (all PRs bucketed)
+  const {
+    data: readiness,
+    isLoading: isLoadingReadiness,
+    refetch: refetchReadiness,
+  } = useTimelineReadiness(owner, repo, {
+    refetchInterval: isBucketingRunning || justTriggered ? 3000 : undefined, // Poll every 3s while running
+  });
+
+  // Refetch readiness when job completes
+  useEffect(() => {
+    if (!isBucketingRunning && justTriggered) {
+      refetchReadiness();
+    }
+  }, [isBucketingRunning, justTriggered, refetchReadiness]);
 
   // Load preloaded data from localStorage on mount
   const [preloadedData, setPreloadedData] = useState<Record<
@@ -113,6 +143,11 @@ const TimelinePage = React.memo(function TimelinePage() {
         }
       }
 
+      // Ensure we have scores before continuing
+      if (!scoresToUse) {
+        throw new Error("Failed to load scores");
+      }
+
       // Step 2: Calculate attribution for each PR (client-side, fast)
       const allData: Record<number, UserAttribution[]> = preloadedData || {};
 
@@ -180,6 +215,64 @@ const TimelinePage = React.memo(function TimelinePage() {
       // Ignore errors
     }
   };
+
+  // Trigger full bucket pipeline
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
+
+  const triggerFullPipeline = async () => {
+    setPipelineError(null);
+
+    try {
+      console.log("Triggering full pipeline for", owner, repo);
+
+      const response = await fetch("/api/trigger/sync-and-bucket-prs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          owner,
+          repo,
+          fullResync: true,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("Pipeline trigger failed:", data);
+
+        // Check if it's an "already running" error
+        const errorMsg = data.error || `HTTP ${response.status}`;
+        if (errorMsg.includes("already running")) {
+          // Job is already running, just mark as triggered
+          setJustTriggered(true);
+          setTimeout(() => setJustTriggered(false), 30000);
+        } else {
+          setPipelineError(errorMsg);
+        }
+        return;
+      }
+
+      console.log("Pipeline triggered successfully:", data);
+      setJustTriggered(true);
+
+      // Clear the flag after 30 seconds (job should be detected by then)
+      setTimeout(() => setJustTriggered(false), 30000);
+    } catch (error) {
+      console.error("Failed to trigger pipeline:", error);
+      const errorMsg =
+        error instanceof Error ? error.message : "Failed to trigger task";
+
+      // Check if it's an "already running" error
+      if (errorMsg.includes("already running")) {
+        setJustTriggered(true);
+        setTimeout(() => setJustTriggered(false), 30000);
+      } else {
+        setPipelineError(errorMsg);
+      }
+    }
+  };
+
+  const isPipelineRunningOrQueued = isBucketingRunning || justTriggered;
 
   // Auto-play functionality
   useEffect(() => {
@@ -252,17 +345,21 @@ const TimelinePage = React.memo(function TimelinePage() {
       });
     } else if (rawScores && currentPrNumber > 0) {
       // Calculate on-the-fly if we have raw scores but not cached result
-      const calculated = calculateTimelineAttribution(
-        rawScores,
-        currentPrNumber,
-      );
-      setDisplayData({
-        items: calculated,
-        totalCount: calculated.length,
-        page: 1,
-        pageSize: 10,
-        hasNext: false,
-      });
+      try {
+        const calculated = calculateTimelineAttribution(
+          rawScores,
+          currentPrNumber,
+        );
+        setDisplayData({
+          items: calculated,
+          totalCount: calculated.length,
+          page: 1,
+          pageSize: 10,
+          hasNext: false,
+        });
+      } catch (error) {
+        console.error("Failed to calculate timeline:", error);
+      }
     }
   }, [preloadedData, currentPrNumber, rawScores]);
 
@@ -276,7 +373,7 @@ const TimelinePage = React.memo(function TimelinePage() {
     };
   }, [displayData]);
 
-  if (isLoadingRange) {
+  if (isLoadingRange || isLoadingReadiness) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center gap-4">
@@ -295,6 +392,8 @@ const TimelinePage = React.memo(function TimelinePage() {
     );
   }
 
+  const isReady = readiness?.isReady ?? false;
+
   return (
     <div className="container mx-auto py-8 px-4 max-w-4xl">
       {/* Header */}
@@ -307,8 +406,62 @@ const TimelinePage = React.memo(function TimelinePage() {
 
       {/* Timeline Controls */}
       <div className="mb-8 space-y-4">
-        {/* Preload Button */}
-        {prRange && (
+        {/* Readiness Check - Show if not all PRs are bucketed */}
+        {!isReady && readiness && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
+              <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
+                  Timeline Not Ready
+                </p>
+                <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                  Only {readiness.scoredPRs} / {readiness.totalMergedPRs} PRs
+                  have been analyzed ({readiness.coverage.toFixed(1)}% coverage)
+                </p>
+                {isPipelineRunningOrQueued && (
+                  <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                    <Loader2 className="inline h-3 w-3 animate-spin mr-1" />
+                    {isBucketingRunning ? (
+                      <>
+                        Analysis in progress... ({readiness.scoredPRs} /{" "}
+                        {readiness.totalMergedPRs} complete)
+                      </>
+                    ) : (
+                      <>Job queued... Starting soon</>
+                    )}
+                  </p>
+                )}
+                {pipelineError && (
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                    Error: {pipelineError}
+                  </p>
+                )}
+              </div>
+              <Button
+                onClick={triggerFullPipeline}
+                disabled={isPipelineRunningOrQueued}
+                variant="default"
+                size="sm"
+              >
+                {isPipelineRunningOrQueued ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {isBucketingRunning ? "Running..." : "Queued..."}
+                  </>
+                ) : (
+                  <>
+                    <Zap className="mr-2 h-4 w-4" />
+                    Analyze All PRs
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Preload Button - Only show when ready */}
+        {isReady && prRange && (
           <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border">
             <div className="flex-1">
               <p className="text-sm font-medium">
@@ -483,7 +636,9 @@ const TimelinePage = React.memo(function TimelinePage() {
       {/* Contributors List */}
       <div className="bg-card rounded-lg border p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">Top 10 in {owner}/{repo}</h2>
+          <h2 className="text-xl font-semibold">
+            Top 10 in {owner}/{repo}
+          </h2>
         </div>
 
         {!displayData && isPreloading ? (

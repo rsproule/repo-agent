@@ -162,9 +162,9 @@ const TimeRangeFilterChartBody: React.FC<ChartProps> = ({
     );
 
     // Distribute PR counts from data.buckets into our day-aligned buckets
-    data.buckets?.forEach((dataBucket: any) => {
-      const dataStartISO = startOfDayISO(new Date(dataBucket.bucket_start));
-      const dataEndISO = endOfDayISO(new Date(dataBucket.bucket_end));
+    data.buckets?.forEach((dataBucket) => {
+      const dataStartISO = startOfDayISO(dataBucket.bucket_start);
+      const dataEndISO = endOfDayISO(dataBucket.bucket_end);
       const dataStart = parseISOToDate(dataStartISO);
       const dataEnd = parseISOToDate(dataEndISO);
 
