@@ -1,7 +1,6 @@
 import { syncRepoPRs } from "@/ai/tools/sync-prs";
 import { prisma } from "@/lib/db";
 import { getInstallationTokenForUser } from "@/lib/github";
-import { JobTracker } from "@/lib/job-tracker";
 import { defaultLogger, type Logger } from "@/lib/logger";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
@@ -242,26 +241,6 @@ export async function bucketPRs(
 
   logger.info("Starting PR bucketing", { owner, repo, fullResync });
 
-  // Check for existing running job (idempotency)
-  const jobTracker = new JobTracker(
-    owner,
-    repo,
-    "bucket_prs",
-    echoUserId,
-    logger,
-  );
-  const { jobId, isNew } = await jobTracker.start({ fullResync });
-
-  if (!isNew) {
-    logger.info("Bucket job already running, returning existing job", {
-      jobId,
-    });
-    // Return a placeholder result - the existing job will complete
-    throw new Error(
-      `Bucket job already running for ${owner}/${repo}. Please wait for it to complete.`,
-    );
-  }
-
   try {
     // Step 1: Sync PRs first
     logger.info("Syncing PRs from GitHub...");
@@ -320,7 +299,7 @@ export async function bucketPRs(
         highestPrNumber: highestPR,
         prCount,
         version: BUCKET_CLASSIFIER_VERSION,
-        model: "gpt-4o-mini",
+        model: "gpt-4.1-mini",
       },
     });
 
@@ -499,23 +478,13 @@ export async function bucketPRs(
       runId: classificationRun.runId,
     });
 
-    // Mark job as complete
-    await jobTracker.complete(jobId, {
-      totalProcessed,
-      totalCost,
-      runId: classificationRun.runId,
-    });
-
     return {
       totalProcessed,
       totalCost,
       runId: classificationRun.runId,
     };
   } catch (error) {
-    // Mark job as failed
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    await jobTracker.fail(jobId, errorMessage);
+    logger.error("PR bucketing failed", { error });
     throw error;
   }
 }
@@ -581,7 +550,7 @@ async function processSinglePR(
 
   // Call OpenAI through Echo SDK
   const result = await generateObject({
-    model: openai("gpt-4o-mini"),
+    model: openai("gpt-4.1-mini"),
     schema: PRClassificationSchema,
     system: PR_CLASSIFICATION_SYSTEM_PROMPT,
     prompt: userMessage,

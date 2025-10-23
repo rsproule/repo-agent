@@ -145,24 +145,3 @@ model PrScore {
   @@map("pr_scores")
 }
 
-model JobRun {
-  id           String    @id @default(cuid())
-  owner        String
-  repo         String
-  jobType      String    @map("job_type") // 'sync_prs', 'bucket_prs', 'full_pipeline'
-  status       String    @default("running") // 'running', 'completed', 'failed'
-  progress     Json?     // { current: 100, total: 500, stage: 'syncing' }
-  startedAt    DateTime  @default(now()) @map("started_at")
-  completedAt  DateTime? @map("completed_at")
-  errorMessage String?   @map("error_message")
-  triggeredBy  String    @map("triggered_by") // echo user id
-  metadata     Json?     // additional job-specific data
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
-
-  @@index([owner, repo])
-  @@index([status])
-  @@index([startedAt])
-  @@index([jobType])
-  @@map("job_runs")
-}

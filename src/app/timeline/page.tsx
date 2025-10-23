@@ -2,13 +2,13 @@
 
 import { ContributorsList } from "@/components/contributor-impact/contributors-list";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import useJobStatus from "@/hooks/use-job-status";
 import { usePrRange } from "@/hooks/use-timeline-attribution";
 import { useTimelineReadiness } from "@/hooks/use-timeline-readiness";
 import type { PaginatedResponse, UserAttribution } from "@/lib/attribution";
 import { calculateTimelineAttribution } from "@/lib/timeline-calculator";
 import {
-  AlertCircle,
   ChevronsLeft,
   Download,
   Loader2,
@@ -39,6 +39,7 @@ const TimelinePage = React.memo(function TimelinePage() {
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(10); // 1x to 100x
   const [isPreloading, setIsPreloading] = useState(false);
   const [justTriggered, setJustTriggered] = useState(false);
+  const [skipLows, setSkipLows] = useState(true); // On by default
 
   // Track bucket job status
   const { isRunning: isBucketingRunning, bucketJob } = useJobStatus(
@@ -284,7 +285,7 @@ const TimelinePage = React.memo(function TimelinePage() {
     const interval = setInterval(() => {
       setCurrentPrNumber((prev) => {
         // Find next available PR number
-        const currentIndex = prRange.prNumbers.indexOf(prev);
+        let currentIndex = prRange.prNumbers.indexOf(prev);
         if (
           currentIndex === -1 ||
           currentIndex >= prRange.prNumbers.length - 1
@@ -292,12 +293,39 @@ const TimelinePage = React.memo(function TimelinePage() {
           setIsPlaying(false);
           return prRange.prNumbers[prRange.prNumbers.length - 1];
         }
+
+        // If skipLows is enabled, find next PR with significant changes
+        if (skipLows && preloadedData) {
+          const currentTop10 = preloadedData[prev]
+            ?.slice(0, 10)
+            .map((u) => u.userId)
+            .join(",");
+
+          // Skip forward until we find a PR where top 10 changes
+          for (let i = currentIndex + 1; i < prRange.prNumbers.length; i++) {
+            const nextPr = prRange.prNumbers[i];
+            const nextTop10 = preloadedData[nextPr]
+              ?.slice(0, 10)
+              .map((u) => u.userId)
+              .join(",");
+
+            // If top 10 contributors changed, use this PR
+            if (nextTop10 && nextTop10 !== currentTop10) {
+              return nextPr;
+            }
+          }
+
+          // If no changes found, go to end
+          setIsPlaying(false);
+          return prRange.prNumbers[prRange.prNumbers.length - 1];
+        }
+
         return prRange.prNumbers[currentIndex + 1];
       });
     }, intervalMs);
 
     return () => clearInterval(interval);
-  }, [isPlaying, prRange, playbackSpeed]);
+  }, [isPlaying, prRange, playbackSpeed, skipLows, preloadedData]);
 
   // Navigation handlers
   const goToStart = () => {
@@ -320,12 +348,6 @@ const TimelinePage = React.memo(function TimelinePage() {
     if (currentIndex < prRange.prNumbers.length - 1) {
       setCurrentPrNumber(prRange.prNumbers[currentIndex + 1]);
     }
-  };
-
-  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!prRange) return;
-    const index = parseInt(e.target.value);
-    setCurrentPrNumber(prRange.prNumbers[index]);
   };
 
   // Keep previous data while loading new data (prevents flash of loading)
@@ -392,7 +414,8 @@ const TimelinePage = React.memo(function TimelinePage() {
     );
   }
 
-  const isReady = readiness?.isReady ?? false;
+  // Timeline is ready if we have ANY scored PRs (not requiring 100%)
+  const isReady = (readiness?.scoredPRs ?? 0) > 0;
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-4xl">
@@ -406,57 +429,51 @@ const TimelinePage = React.memo(function TimelinePage() {
 
       {/* Timeline Controls */}
       <div className="mb-8 space-y-4">
-        {/* Readiness Check - Show if not all PRs are bucketed */}
-        {!isReady && readiness && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-3 p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
-              <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
-                  Timeline Not Ready
-                </p>
-                <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
-                  Only {readiness.scoredPRs} / {readiness.totalMergedPRs} PRs
-                  have been analyzed ({readiness.coverage.toFixed(1)}% coverage)
-                </p>
-                {isPipelineRunningOrQueued && (
-                  <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
-                    <Loader2 className="inline h-3 w-3 animate-spin mr-1" />
-                    {isBucketingRunning ? (
-                      <>
-                        Analysis in progress... ({readiness.scoredPRs} /{" "}
-                        {readiness.totalMergedPRs} complete)
-                      </>
-                    ) : (
-                      <>Job queued... Starting soon</>
-                    )}
-                  </p>
-                )}
-                {pipelineError && (
-                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                    Error: {pipelineError}
-                  </p>
-                )}
+        {/* Show analysis progress if not at 100% */}
+        {readiness && readiness.coverage < 100 && (
+          <div className="flex items-center gap-3 p-3 bg-card rounded-lg border">
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {isPipelineRunningOrQueued && (
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  )}
+                  <span className="text-sm font-medium">
+                    {isPipelineRunningOrQueued
+                      ? "Analyzing PRs"
+                      : readiness.scoredPRs === 0
+                      ? "Setup Required"
+                      : "Analysis Incomplete"}
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {readiness.scoredPRs} / {readiness.totalMergedPRs} (
+                  {readiness.coverage.toFixed(1)}%)
+                </span>
               </div>
-              <Button
-                onClick={triggerFullPipeline}
-                disabled={isPipelineRunningOrQueued}
-                variant="default"
-                size="sm"
-              >
-                {isPipelineRunningOrQueued ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {isBucketingRunning ? "Running..." : "Queued..."}
-                  </>
-                ) : (
-                  <>
-                    <Zap className="mr-2 h-4 w-4" />
-                    Analyze All PRs
-                  </>
-                )}
-              </Button>
+
+              <div className="w-full bg-muted rounded-full h-1.5">
+                <div
+                  className="bg-primary h-1.5 rounded-full transition-all duration-500"
+                  style={{
+                    width: `${readiness.coverage}%`,
+                  }}
+                />
+              </div>
+
+              {pipelineError && (
+                <p className="text-xs text-destructive">{pipelineError}</p>
+              )}
             </div>
+
+            {!isPipelineRunningOrQueued && (
+              <Button onClick={triggerFullPipeline} variant="default" size="sm">
+                <Zap className="mr-2 h-4 w-4" />
+                {readiness.scoredPRs === 0
+                  ? "Start Analysis"
+                  : "Complete Analysis"}
+              </Button>
+            )}
           </div>
         )}
 
@@ -594,34 +611,48 @@ const TimelinePage = React.memo(function TimelinePage() {
             <span className="text-xs text-muted-foreground whitespace-nowrap">
               Speed:
             </span>
-            <input
-              type="range"
+            <Slider
+              value={[playbackSpeed]}
+              onValueChange={(value: number[]) => setPlaybackSpeed(value[0])}
               min={1}
               max={100}
-              value={playbackSpeed}
-              onChange={(e) => setPlaybackSpeed(parseInt(e.target.value))}
-              className="w-20 h-1 bg-muted rounded-lg appearance-none cursor-pointer speed-slider"
+              step={1}
+              className="w-20"
             />
             <span className="text-xs font-mono w-8 text-right">
               {playbackSpeed}x
             </span>
           </div>
 
-          <div className="flex-1 flex items-center gap-4">
+          {/* Skip Lows Checkbox */}
+          <div className="flex items-center gap-2 px-3 py-1 border rounded-md bg-background">
             <input
-              type="range"
+              type="checkbox"
+              id="skip-lows"
+              checked={skipLows}
+              onChange={(e) => setSkipLows(e.target.checked)}
+              className="rounded border-muted-foreground"
+            />
+            <label
+              htmlFor="skip-lows"
+              className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer"
+            >
+              Skip unchanged
+            </label>
+          </div>
+
+          <div className="flex-1 flex items-center gap-4">
+            <Slider
+              value={[currentPrIndex]}
+              onValueChange={(value: number[]) => {
+                if (prRange) {
+                  setCurrentPrNumber(prRange.prNumbers[value[0]]);
+                }
+              }}
               min={0}
               max={prRange.prNumbers.length - 1}
-              value={currentPrIndex}
-              onChange={handleSliderChange}
-              className="flex-1 h-2 bg-muted rounded-lg appearance-none cursor-pointer slider"
-              style={{
-                background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${
-                  (currentPrIndex / (prRange.prNumbers.length - 1)) * 100
-                }%, hsl(var(--muted)) ${
-                  (currentPrIndex / (prRange.prNumbers.length - 1)) * 100
-                }%, hsl(var(--muted)) 100%)`,
-              }}
+              step={1}
+              className="flex-1"
             />
             <div className="text-sm font-mono whitespace-nowrap min-w-[120px]">
               PR #{currentPrNumber}
@@ -637,7 +668,7 @@ const TimelinePage = React.memo(function TimelinePage() {
       <div className="bg-card rounded-lg border p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold">
-            Top 10 in {owner}/{repo}
+            Top 10 contributors by Merit Impact in {owner}/{repo}
           </h2>
         </div>
 
@@ -662,46 +693,6 @@ const TimelinePage = React.memo(function TimelinePage() {
           </div>
         )}
       </div>
-
-      {/* Slider styles */}
-      <style jsx>{`
-        .slider::-webkit-slider-thumb {
-          appearance: none;
-          width: 20px;
-          height: 20px;
-          border-radius: 50%;
-          background: hsl(var(--primary));
-          cursor: pointer;
-          border: 2px solid hsl(var(--background));
-        }
-
-        .slider::-moz-range-thumb {
-          width: 20px;
-          height: 20px;
-          border-radius: 50%;
-          background: hsl(var(--primary));
-          cursor: pointer;
-          border: 2px solid hsl(var(--background));
-        }
-
-        .speed-slider::-webkit-slider-thumb {
-          appearance: none;
-          width: 12px;
-          height: 12px;
-          border-radius: 50%;
-          background: hsl(var(--primary));
-          cursor: pointer;
-        }
-
-        .speed-slider::-moz-range-thumb {
-          width: 12px;
-          height: 12px;
-          border-radius: 50%;
-          background: hsl(var(--primary));
-          cursor: pointer;
-          border: none;
-        }
-      `}</style>
     </div>
   );
 });

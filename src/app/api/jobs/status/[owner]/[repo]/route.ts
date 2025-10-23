@@ -11,16 +11,14 @@ interface TriggerRun {
   id: string;
   status: string;
   taskIdentifier?: string;
-  payload?: {
-    owner?: string;
-    repo?: string;
-  };
+  tags?: string[];
   createdAt?: Date;
   completedAt?: Date;
+  finishedAt?: Date;
 }
 
 export async function GET(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<Params> },
 ) {
   try {
@@ -38,77 +36,26 @@ export async function GET(
       );
     }
 
-    const repository = `${owner}/${repo}`;
-
     try {
-      // Get recent runs for the sync and bucket tasks (only active ones)
-      const recentRuns = await runs.list({
-        status: ["WAITING_FOR_DEPLOY", "QUEUED", "EXECUTING", "REATTEMPTING"],
-      });
+      // Get runs filtered by tags - this uses the tags we set when triggering
+      const activeRuns = await runs.list({
+        status: [
+          "WAITING_FOR_DEPLOY",
+          "QUEUED",
+          "EXECUTING",
+          "REATTEMPTING",
+        ] as any,
+        tag: [owner, repo], // Filter by repository tags
+      } as any);
 
-      // Filter runs that are sync/bucket related - ONLY match if we can verify the repo
-      const relevantRuns = recentRuns.data.filter((run) => {
-        const triggerRun = run as TriggerRun;
-        const taskId = triggerRun.taskIdentifier;
-        const isRelevantTask =
-          taskId === "sync-prs" ||
-          taskId === "bucket-prs" ||
-          taskId === "sync-and-bucket-prs";
-
-        if (!isRelevantTask) return false;
-
-        const payload = triggerRun.payload;
-        if (payload && payload.owner && payload.repo) {
-          const runRepo = `${payload.owner}/${payload.repo}`;
-          const isRepoMatch = runRepo === repository;
-          return isRepoMatch;
-        }
-
-        // If no payload or missing owner/repo, we can't verify this is for the right repo
-        // Return false to avoid showing jobs from other repos
-        return false;
-      });
-
-      const isRunning = relevantRuns.length > 0;
-
-      // Get completed runs for freshness check
       const completedRuns = await runs.list({
-        status: ["COMPLETED"],
-      });
+        status: ["COMPLETED", "FAILED"] as any,
+        tag: [owner, repo], // Filter by repository tags
+        limit: 10, // Get recent completed runs
+      } as any);
 
-      const recentCompletedRuns = completedRuns.data.filter((run) => {
-        const triggerRun = run as TriggerRun;
-        const payload = triggerRun.payload;
-        if (!payload) return false;
-        const runRepo = `${payload?.owner}/${payload?.repo}`;
-        const taskId = triggerRun.taskIdentifier;
-        return (
-          runRepo === repository &&
-          (taskId === "sync-prs" ||
-            taskId === "bucket-prs" ||
-            taskId === "sync-and-bucket-prs")
-        );
-      });
-
-      const latestCompletedRun = recentCompletedRuns[0];
-
-      // Determine data freshness
-      let dataFreshness: "fresh" | "stale" | "unknown" = "unknown";
-
-      if (isRunning) {
-        dataFreshness = "fresh"; // Data is being updated
-      } else if (
-        latestCompletedRun &&
-        (latestCompletedRun as TriggerRun).completedAt
-      ) {
-        const hoursSinceCompletion =
-          (Date.now() -
-            (latestCompletedRun as TriggerRun).completedAt!.getTime()) /
-          (1000 * 60 * 60);
-        dataFreshness = hoursSinceCompletion < 24 ? "fresh" : "stale";
-      }
-
-      const currentJobs = relevantRuns.map((run) => {
+      // Map active runs to job format
+      const currentJobs = activeRuns.data.map((run) => {
         const triggerRun = run as TriggerRun;
         return {
           id: run.id,
@@ -116,27 +63,38 @@ export async function GET(
             | "sync-prs"
             | "bucket-prs"
             | "sync-and-bucket-prs",
-          status: run.status.toLowerCase() as
-            | "waiting"
-            | "queued"
-            | "executing"
-            | "completed"
-            | "failed",
-          startedAt:
-            triggerRun.createdAt?.toISOString() || new Date().toISOString(),
-          progress:
-            run.status === "EXECUTING"
-              ? { current: 1, total: 1, stage: "processing" }
-              : undefined,
+          status: mapTriggerStatus(run.status),
+          startedAt: triggerRun.createdAt?.toISOString() || new Date().toISOString(),
+          progress: run.status === "EXECUTING"
+            ? { current: 1, total: 1, stage: "processing" }
+            : undefined,
         };
       });
+
+      const isRunning = currentJobs.length > 0;
+
+      // Find most recent completed run
+      const latestCompletedRun = completedRuns.data[0] as TriggerRun | undefined;
+
+      // Determine data freshness
+      let dataFreshness: "fresh" | "stale" | "unknown" = "unknown";
+
+      if (isRunning) {
+        dataFreshness = "fresh"; // Data is being updated
+      } else if (latestCompletedRun) {
+        const completedTime = latestCompletedRun.completedAt || latestCompletedRun.finishedAt;
+        if (completedTime) {
+          const hoursSinceCompletion = (Date.now() - completedTime.getTime()) / (1000 * 60 * 60);
+          dataFreshness = hoursSinceCompletion < 24 ? "fresh" : "stale";
+        }
+      }
 
       const response = {
         currentJobs,
         isRunning,
-        lastSuccessfulSync: (
-          latestCompletedRun as TriggerRun
-        )?.completedAt?.toISOString(),
+        lastSuccessfulSync: latestCompletedRun?.status === "COMPLETED"
+          ? (latestCompletedRun.completedAt || latestCompletedRun.finishedAt)?.toISOString()
+          : undefined,
         dataFreshness,
         latestJobStatus: latestCompletedRun?.status?.toLowerCase() || null,
       };
@@ -166,5 +124,28 @@ export async function GET(
       },
       { status: 500 },
     );
+  }
+}
+
+function mapTriggerStatus(status: string): "waiting" | "queued" | "executing" | "completed" | "failed" {
+  switch (status) {
+    case "WAITING_FOR_DEPLOY":
+      return "waiting";
+    case "QUEUED":
+      return "queued";
+    case "EXECUTING":
+    case "REATTEMPTING":
+      return "executing";
+    case "COMPLETED":
+      return "completed";
+    case "FAILED":
+    case "CANCELED":
+    case "CRASHED":
+    case "INTERRUPTED":
+    case "SYSTEM_FAILURE":
+    case "EXPIRED":
+      return "failed";
+    default:
+      return "queued";
   }
 }

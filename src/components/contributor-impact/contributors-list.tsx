@@ -246,7 +246,7 @@ const UserRow: React.FC<UserRowProps> = ({
             })}
           </div>
         </VStack>
-        <div className="w-32 md:w-48 -scale-x-100">
+        <div className="w-64 md:w-96 -scale-x-100">
           <AttributionBar
             width={(user.pct / maxPct) * 100}
             bucketAttributions={[
@@ -274,7 +274,7 @@ const LoadingUserRow: React.FC = () => {
           <div className="h-[14px] w-24 bg-muted rounded animate-pulse" />
           <div className="h-3 w-8 bg-muted rounded animate-pulse" />
         </VStack>
-        <div className="h-2 w-32 md:w-48 bg-muted rounded animate-pulse" />
+        <div className="h-3 w-64 md:w-96 bg-muted rounded animate-pulse" />
       </div>
     </div>
   );

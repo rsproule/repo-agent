@@ -31,7 +31,7 @@ export const AttributionBar: React.FC<Props> = ({
 
   return (
     <div
-      className="w-full h-2 rounded-full overflow-hidden"
+      className="w-full h-3 rounded-full overflow-hidden transition-all duration-300 ease-out"
       style={{ width: `${width}%` }}
     >
       <div className="flex h-full divide-x divide-white/40 dark:divide-black/40">
@@ -40,7 +40,10 @@ export const AttributionBar: React.FC<Props> = ({
             percentage > 0 && (
               <div
                 key={index}
-                className={cn("h-full", getBucketClass(index))}
+                className={cn(
+                  "h-full transition-all duration-300 ease-out",
+                  getBucketClass(index),
+                )}
                 style={{
                   width: `${percentage}%`,
                 }}
@@ -60,12 +63,17 @@ export const LoadingAttributionBar: React.FC<LoadingProps> = ({ width }) => {
   const randomAttributions = useMemo(() => {
     const numbers = Array.from({ length: 4 }, () => Math.random());
     const sum = numbers.reduce((a, b) => a + b, 0);
-    return numbers.map((n) => (n / sum) * 100) as [number, number, number, number];
+    return numbers.map((n) => (n / sum) * 100) as [
+      number,
+      number,
+      number,
+      number,
+    ];
   }, []);
 
   return (
     <div
-      className="w-full h-2 rounded-full overflow-hidden animate-pulse"
+      className="w-full h-3 rounded-full overflow-hidden animate-pulse"
       style={{ width: `${width}%` }}
     >
       <div className="flex h-full divide-x divide-white/40 dark:divide-black/40">
