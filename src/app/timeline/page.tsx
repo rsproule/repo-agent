@@ -665,11 +665,33 @@ const TimelinePage = React.memo(function TimelinePage() {
       </div>
 
       {/* Contributors List */}
-      <div className="bg-card rounded-lg border p-6">
+      <div className="bg-card rounded-lg border p-6 relative">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold">
-            Top 10 contributors by Merit Impact in {owner}/{repo}
+            Top 10 contributors by <span className="text-primary">Impact</span>{" "}
+            in {owner}/{repo}
           </h2>
+
+          {/* Legend */}
+          <div className="flex items-center gap-3 text-xs">
+            <span className="text-muted-foreground">Impact:</span>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-sm bg-primary-15" />
+              <span className="text-muted-foreground">Low</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-sm bg-primary-30" />
+              <span className="text-muted-foreground">Med</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-sm bg-primary-60" />
+              <span className="text-muted-foreground">High</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-sm bg-primary-100" />
+              <span className="text-muted-foreground">Max</span>
+            </div>
+          </div>
         </div>
 
         {!displayData && isPreloading ? (
@@ -692,6 +714,20 @@ const TimelinePage = React.memo(function TimelinePage() {
             No data available
           </div>
         )}
+
+        {/* Merit Logo Watermark */}
+        <div className="absolute bottom-4 right-4 opacity-70 transition-opacity">
+          <img
+            src="/logo/merit-dark.png"
+            alt="Merit"
+            className="h-5 dark:hidden"
+          />
+          <img
+            src="/logo/merit-light.png"
+            alt="Merit"
+            className="h-5 hidden dark:block"
+          />
+        </div>
       </div>
     </div>
   );
