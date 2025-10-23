@@ -1,14 +1,18 @@
-import React, { useState, useMemo } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { AttributionBar } from "@/components/ui/attribution-bar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { AttributionBar } from "@/components/ui/attribution-bar";
 import { VStack } from "@/components/ui/stack";
 import { cn } from "@/lib/utils";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import React, { useMemo, useState } from "react";
 
 // Use existing API types
-import type { UserAttribution, PaginatedResponse as ExistingPaginatedResponse } from "@/lib/attribution";
+import type {
+  PaginatedResponse as ExistingPaginatedResponse,
+  UserAttribution,
+} from "@/lib/attribution";
 
 interface UserRepoSearchResult {
   id: number;
@@ -18,7 +22,7 @@ interface UserRepoSearchResult {
 
 interface InfiniteQueryResult<T> {
   pages: ExistingPaginatedResponse<T>[];
-  pageParams: any[];
+  pageParams: unknown[];
 }
 
 interface Props {
@@ -33,9 +37,9 @@ interface Props {
   fetchNextPage?: () => void;
   minTime: string;
   maxTime: string;
+  usersToShow?: number;
+  showPagination?: boolean;
 }
-
-const USERS_TO_SHOW = 4;
 
 export const ContributorsList: React.FC<Props> = ({
   users,
@@ -44,8 +48,11 @@ export const ContributorsList: React.FC<Props> = ({
   hasNextPage,
   isFetchingNextPage,
   fetchNextPage,
+  usersToShow = 4,
+  showPagination = true,
 }) => {
   const [currentPage, setCurrentPage] = useState(0);
+  const USERS_TO_SHOW = usersToShow;
 
   const flatUsers = useMemo(() => {
     if (!users.data) return [];
@@ -53,7 +60,9 @@ export const ContributorsList: React.FC<Props> = ({
   }, [users]);
 
   const data = useMemo(() => {
-    return flatUsers.sort((a: UserAttribution, b: UserAttribution) => b.pct - a.pct);
+    return flatUsers.sort(
+      (a: UserAttribution, b: UserAttribution) => b.pct - a.pct,
+    );
   }, [flatUsers]);
 
   const totalPages = Math.ceil(
@@ -95,21 +104,36 @@ export const ContributorsList: React.FC<Props> = ({
           style={{ height: `${pageHeight}px` }}
         >
           <div
-            className="flex flex-col transition-transform duration-200"
+            className="flex flex-col"
             style={{
               transform: `translateY(-${currentPage * pageHeight}px)`,
+              transition: "transform 200ms ease-out",
             }}
           >
-            {data.map((user: UserAttribution) => (
-              <UserRow
-                key={user.userId}
-                user={user}
-                maxPct={maxPct}
-                style={{ marginBottom: `${gapHeight}px` }}
-                filterUser={filterUser}
-                setFilterUser={setFilterUser}
-              />
-            ))}
+            <AnimatePresence initial={false}>
+              {data.map((user: UserAttribution) => (
+                <motion.div
+                  key={user.userId}
+                  layout
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{
+                    layout: { duration: 0.3, ease: "easeInOut" },
+                    opacity: { duration: 0.2 },
+                    y: { duration: 0.2 },
+                  }}
+                >
+                  <UserRow
+                    user={user}
+                    maxPct={maxPct}
+                    style={{ marginBottom: `${gapHeight}px` }}
+                    filterUser={filterUser}
+                    setFilterUser={setFilterUser}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
             {isFetchingNextPage && (
               <div className="flex flex-col">
                 {Array.from({ length: USERS_TO_SHOW }).map((_, index) => (
@@ -119,50 +143,51 @@ export const ContributorsList: React.FC<Props> = ({
             )}
           </div>
         </div>
-        {(users.data?.pages?.[0]?.totalCount ?? 0) > USERS_TO_SHOW && (
-          <div
-            className="flex flex-col justify-between h-full opacity-100 transition-all w-5 pt-2 pb-4 gap-2 items-center"
-            style={{ height: `${pageHeight}px` }}
-          >
-            <Button
-              onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
-              disabled={currentPage === 0}
-              variant="ghost"
-              size="sm"
-              className="h-fit p-1"
+        {showPagination &&
+          (users.data?.pages?.[0]?.totalCount ?? 0) > USERS_TO_SHOW && (
+            <div
+              className="flex flex-col justify-between h-full opacity-100 transition-all w-5 pt-2 pb-4 gap-2 items-center"
+              style={{ height: `${pageHeight}px` }}
             >
-              <ChevronUp className="size-3" />
-            </Button>
-            <Progress
-              value={((currentPage + 1) / totalPages) * 100}
-              vertical
-              className="rotate-180 w-2"
-              indicatorColor="bg-primary"
-            />
-            <Button
-              onClick={() => {
-                if (
-                  currentPage === (users.data?.pages.length ?? 0) - 1 &&
-                  hasNextPage
-                ) {
-                  fetchNextPage?.();
+              <Button
+                onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
+                disabled={currentPage === 0}
+                variant="ghost"
+                size="sm"
+                className="h-fit p-1"
+              >
+                <ChevronUp className="size-3" />
+              </Button>
+              <Progress
+                value={((currentPage + 1) / totalPages) * 100}
+                vertical
+                className="rotate-180 w-2"
+                indicatorColor="bg-primary"
+              />
+              <Button
+                onClick={() => {
+                  if (
+                    currentPage === (users.data?.pages.length ?? 0) - 1 &&
+                    hasNextPage
+                  ) {
+                    fetchNextPage?.();
+                  }
+                  setCurrentPage(Math.min(totalPages - 1, currentPage + 1));
+                }}
+                disabled={
+                  (currentPage === (users.data?.pages.length ?? 0) - 1 &&
+                    !hasNextPage) ||
+                  (currentPage >= (users.data?.pages.length ?? 0) - 1 &&
+                    isFetchingNextPage)
                 }
-                setCurrentPage(Math.min(totalPages - 1, currentPage + 1));
-              }}
-              disabled={
-                (currentPage === (users.data?.pages.length ?? 0) - 1 &&
-                  !hasNextPage) ||
-                (currentPage >= (users.data?.pages.length ?? 0) - 1 &&
-                  isFetchingNextPage)
-              }
-              variant="ghost"
-              size="sm"
-              className="h-fit p-1"
-            >
-              <ChevronDown className="size-3" />
-            </Button>
-          </div>
-        )}
+                variant="ghost"
+                size="sm"
+                className="h-fit p-1"
+              >
+                <ChevronDown className="size-3" />
+              </Button>
+            </div>
+          )}
       </div>
     </div>
   );
@@ -241,7 +266,7 @@ const LoadingUserRow: React.FC = () => {
   return (
     <div
       className="flex gap-2 w-full max-w-full overflow-hidden items-center px-1"
-      style={{ height: '36px', marginBottom: '8px' }}
+      style={{ height: "36px", marginBottom: "8px" }}
     >
       <div className="size-7 bg-muted rounded-full animate-pulse" />
       <div className="flex flex-1 overflow-hidden gap-1 w-full flex-row items-center justify-between">

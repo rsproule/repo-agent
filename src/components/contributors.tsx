@@ -6,7 +6,7 @@ import { SubCard } from "@/components/ui/sub-card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
-import { VStack, HStack } from "@/components/ui/stack";
+import { VStack } from "@/components/ui/stack";
 import { AttributionBar } from "@/components/ui/attribution-bar";
 
 import { cn } from "@/lib/utils";

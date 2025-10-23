@@ -4,6 +4,7 @@ export interface AttributionPreFilters {
   filterIds?: string[];
   minTime?: string;
   maxTime?: string;
+  maxPrNumber?: number;
 }
 
 export interface AttributionOverrides {
@@ -79,6 +80,9 @@ export async function getAttributionByUser(
   }
   if (preFilters.maxTime) {
     timeFilters.push(`pr.merged_at <= '${preFilters.maxTime}'::timestamptz`);
+  }
+  if (preFilters.maxPrNumber !== undefined) {
+    timeFilters.push(`pr.pr_number <= ${preFilters.maxPrNumber}`);
   }
   const timeCondition =
     timeFilters.length > 0 ? `AND ${timeFilters.join(" AND ")}` : "";
@@ -272,6 +276,9 @@ export async function getAttributionByPR(
   if (preFilters.maxTime) {
     timeFilters.push(`pr.merged_at <= '${preFilters.maxTime}'::timestamptz`);
   }
+  if (preFilters.maxPrNumber !== undefined) {
+    timeFilters.push(`pr.pr_number <= ${preFilters.maxPrNumber}`);
+  }
   const timeCondition =
     timeFilters.length > 0 ? `AND ${timeFilters.join(" AND ")}` : "";
 
@@ -445,7 +452,6 @@ export async function getQuartiles(
   repo: string,
   preFilters: AttributionPreFilters = {},
 ): Promise<Quartile[]> {
-
   // Build time filter conditions
   const timeFilters: string[] = [];
   if (preFilters.minTime) {
@@ -453,6 +459,9 @@ export async function getQuartiles(
   }
   if (preFilters.maxTime) {
     timeFilters.push(`pr.merged_at <= '${preFilters.maxTime}'::timestamptz`);
+  }
+  if (preFilters.maxPrNumber !== undefined) {
+    timeFilters.push(`pr.pr_number <= ${preFilters.maxPrNumber}`);
   }
   const timeCondition =
     timeFilters.length > 0 ? `AND ${timeFilters.join(" AND ")}` : "";

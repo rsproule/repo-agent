@@ -599,7 +599,7 @@ async function syncSinglePage(
 
   if (prsResult.isErr()) {
     const error = prsResult.error;
-    const errorStatus = (error.cause as any)?.status;
+    const errorStatus = (error.cause as { status?: number })?.status;
 
     // Handle specific errors
     if (errorStatus === 401 || errorStatus === 403) {

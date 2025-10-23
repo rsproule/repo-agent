@@ -32,7 +32,7 @@ export class JobTracker {
   /**
    * Start a job with idempotency - returns existing running job or creates new one
    */
-  async start(metadata?: any): Promise<{ jobId: string; isNew: boolean }> {
+  async start(metadata?: Record<string, unknown>): Promise<{ jobId: string; isNew: boolean }> {
     try {
       // Check for existing running job
       const existingJob = await prisma.jobRun.findFirst({
@@ -102,7 +102,7 @@ export class JobTracker {
   /**
    * Complete job successfully
    */
-  async complete(jobId: string, metadata?: any): Promise<void> {
+  async complete(jobId: string, metadata?: Record<string, unknown>): Promise<void> {
     try {
       await prisma.jobRun.update({
         where: { id: jobId },
@@ -128,7 +128,7 @@ export class JobTracker {
   /**
    * Mark job as failed
    */
-  async fail(jobId: string, errorMessage: string, metadata?: any): Promise<void> {
+  async fail(jobId: string, errorMessage: string, metadata?: Record<string, unknown>): Promise<void> {
     try {
       await prisma.jobRun.update({
         where: { id: jobId },
@@ -160,7 +160,7 @@ export class JobTracker {
     repo: string,
     jobType?: JobType,
   ): Promise<JobRunInfo | null> {
-    const where: any = { owner, repo };
+    const where: { owner: string; repo: string; jobType?: JobType } = { owner, repo };
     if (jobType) {
       where.jobType = jobType;
     }
@@ -191,7 +191,7 @@ export class JobTracker {
     repo: string,
     jobType?: JobType,
   ): Promise<boolean> {
-    const where: any = { owner, repo, status: 'running' };
+    const where: { owner: string; repo: string; status: string; jobType?: JobType } = { owner, repo, status: 'running' };
     if (jobType) {
       where.jobType = jobType;
     }

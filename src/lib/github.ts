@@ -88,7 +88,7 @@ export async function getInstallationTokenForRepo(
     );
 
     return tokenResponse.data.token;
-  } catch (error: any) {
+  } catch (_error: unknown) {
     throw new Error(
       `GitHub App is not installed on repository ${owner}/${repo}. ` +
       `Please install the app at: ${getGitHubAppInstallUrl()}`

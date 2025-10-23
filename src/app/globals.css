@@ -175,3 +175,18 @@
     letter-spacing: var(--tracking-normal);
   }
 }
+
+@layer utilities {
+  .bg-primary-15 {
+    background-color: oklch(from var(--primary) l c h / 0.15);
+  }
+  .bg-primary-30 {
+    background-color: oklch(from var(--primary) l c h / 0.3);
+  }
+  .bg-primary-60 {
+    background-color: oklch(from var(--primary) l c h / 0.6);
+  }
+  .bg-primary-100 {
+    background-color: var(--primary);
+  }
+}

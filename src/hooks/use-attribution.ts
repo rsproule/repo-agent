@@ -11,12 +11,12 @@ import type {
 
 interface InfiniteQueryResult<T> {
   pages: PaginatedResponse<T>[];
-  pageParams: any[];
+  pageParams: unknown[];
 }
 
 const API_BASE = '/api/attribution';
 
-async function fetchWithQuery(url: string, params: Record<string, any> = {}) {
+async function fetchWithQuery(url: string, params: Record<string, unknown> = {}) {
   const searchParams = new URLSearchParams();
 
   Object.entries(params).forEach(([key, value]) => {
@@ -243,7 +243,7 @@ export function usePrAggregation(
           start: new Date(response.query_period.start),
           end: new Date(response.query_period.end),
         },
-        buckets: response.buckets.map((bucket: any) => ({
+        buckets: response.buckets.map((bucket: { bucket_start: string; bucket_end: string; pr_count: number }) => ({
           bucket_start: new Date(bucket.bucket_start),
           bucket_end: new Date(bucket.bucket_end),
           pr_count: bucket.pr_count,

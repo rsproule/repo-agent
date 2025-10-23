@@ -11,7 +11,7 @@ import type {
 import { useRepositoryMetadata } from "@/hooks/use-attribution";
 import { useJobStatus } from "@/hooks/use-job-status";
 import { useState } from "react";
-import { Loader2, Database, Zap } from "lucide-react";
+import { Loader2, Database } from "lucide-react";
 
 export default function AttributionPage() {
   const [owner, setOwner] = useState("merit-systems");
@@ -34,11 +34,11 @@ export default function AttributionPage() {
     useRepositoryMetadata(owner, repo, { enabled: isEnabled });
 
   // Example filters and overrides
-  const preFilters: AttributionPreFilters = {
+  const _preFilters: AttributionPreFilters = {
     // Can add min/max time filters here if needed
   };
 
-  const overrides: AttributionOverrides = {
+  const _overrides: AttributionOverrides = {
     // Can add bucket percentage overrides here if needed
   };
 
@@ -161,8 +161,8 @@ export default function AttributionPage() {
       {!isEnabled && (
         <Card className="p-8 text-center">
           <p className="text-gray-500 text-lg">
-            Enter a repository owner and name above, then click "Load
-            Attribution Data" to see the components in action.
+            Enter a repository owner and name above, then click &quot;Load
+            Attribution Data&quot; to see the components in action.
           </p>
         </Card>
       )}

@@ -318,7 +318,14 @@ export async function bucketPRs(
 
   while (true) {
     // Get next batch of PRs
-    const whereClause: any = {
+    const whereClause: {
+      owner: string;
+      repo: string;
+      state: string;
+      mergedAt: { not: null };
+      prNumber?: { gt: number };
+      AND?: unknown;
+    } = {
       owner,
       repo,
       state: "closed",
@@ -494,11 +501,11 @@ const PRClassificationSchema = z.object({
 
 // Process a single PR
 async function processSinglePR(
-  pr: any,
+  pr: { prNumber: number; prId: bigint; title?: string; body?: string | null },
   owner: string,
   repo: string,
   octokit: Octokit,
-  logger: Logger,
+  _logger: Logger,
 ): Promise<{ bucket: number; usage: UsageInfo }> {
   // Fetch PR files
   const { data: files } = await octokit.rest.pulls.listFiles({
