@@ -1,6 +1,6 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
-import { subMonths, subDays } from "date-fns";
+import { subMonths, subDays, max, min } from "date-fns";
 
 import { Card } from "@/components/ui/card";
 import { HStack } from "@/components/ui/stack";
@@ -12,6 +12,7 @@ import { TimeRangeButtons } from "./time-range-buttons";
 import { TimeRangeOptions } from "./time-range-options";
 
 import { usePrAggregation } from "@/hooks/use-attribution";
+import { useJobStatus } from "@/hooks/use-job-status";
 
 import { cn } from "@/lib/utils";
 import { endOfDayISO, parseISOToDate, startOfDayISO } from "@/lib/date-utils";
@@ -35,12 +36,6 @@ export const PrGraph: React.FC<Props> = ({
   setMinTime,
   setMaxTime,
 }) => {
-  const [startWindow] = useState(
-    repo.created_at
-      ? startOfDayISO(new Date(repo.created_at))
-      : startOfDayISO(new Date()),
-  );
-  const [endWindow] = useState(endOfDayISO(maxTime));
   const [months, setMonths] = useState(0);
 
   const [selectedTimeRangeOption, setSelectedTimeRangeOption] = useState(
@@ -51,16 +46,56 @@ export const PrGraph: React.FC<Props> = ({
   const [dragRangeEnd, setDragRangeEnd] = useState<Date | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
+  // Check if sync jobs are running for progressive updates
+  const { isRunning } = useJobStatus(repo.owner.login, repo.name, {
+    refreshInterval: 3000,
+    enabled: true,
+  });
+
   const { data: prData, isLoading } = usePrAggregation(
     repo.owner.login,
     repo.name,
     {
-      start_window: startWindow,
-      end_window: endWindow,
+      start_window: minTime.toISOString(),
+      end_window: maxTime.toISOString(),
       window: 'day',
     },
+    {
+      enabled: true,
+      // Refresh faster when jobs are running to show progressive updates
+      refreshInterval: isRunning ? 5000 : 30000,
+    }
   );
 
+  // Auto-expand selection bounds when new data arrives during sync
+  useEffect(() => {
+    if (prData && prData.buckets && prData.buckets.length > 0 && isRunning) {
+      const dataBounds = prData.buckets.reduce(
+        (bounds, bucket) => {
+          const bucketStart = new Date(bucket.bucket_start);
+          const bucketEnd = new Date(bucket.bucket_end);
+          return {
+            earliest: bounds.earliest ? min([bounds.earliest, bucketStart]) : bucketStart,
+            latest: bounds.latest ? max([bounds.latest, bucketEnd]) : bucketEnd,
+          };
+        },
+        { earliest: null as Date | null, latest: null as Date | null }
+      );
+
+      if (dataBounds.earliest && dataBounds.latest) {
+        // If we're on "All" selection, automatically expand the selection to show all data
+        if (selectedTimeRangeOption === TimeRangeOptions.All) {
+          const repoCreationDate = repo.created_at ? new Date(repo.created_at) : null;
+          const effectiveStartDate = repoCreationDate
+            ? min([repoCreationDate, dataBounds.earliest])
+            : dataBounds.earliest;
+
+          setMinTime(effectiveStartDate);
+          setMaxTime(dataBounds.latest);
+        }
+      }
+    }
+  }, [prData, isRunning, selectedTimeRangeOption, setMinTime, setMaxTime, repo.created_at]);
 
   // Find the bucket for a given x-axis date string
   const findBucketByDate = useCallback(

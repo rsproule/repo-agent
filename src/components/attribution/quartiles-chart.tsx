@@ -3,7 +3,9 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { useAttributionQuartiles } from '@/hooks/use-attribution';
+import { useJobStatus } from '@/hooks/use-job-status';
 import { cn } from '@/lib/utils';
+import { Loader2 } from 'lucide-react';
 import type {
   AttributionPreFilters,
   AttributionPostFilters,
@@ -28,13 +30,23 @@ export const QuartilesChart: React.FC<Props> = ({
   overrides,
   isEnabled = true,
 }) => {
+  // Check job status for sync/bucket operations
+  const { isRunning, anyRunningJob } = useJobStatus(owner, repo, {
+    refreshInterval: isEnabled ? 3000 : 0, // Poll every 3 seconds when enabled
+    enabled: isEnabled,
+  });
+
+  // Get attribution data with increased refresh rate when jobs are running
   const { data: quartiles, isLoading } = useAttributionQuartiles(
     owner,
     repo,
     preFilters,
     postFilters,
     overrides,
-    { enabled: isEnabled }
+    {
+      enabled: isEnabled,
+      refreshInterval: isRunning ? 5000 : 30000, // Faster refresh when jobs are running
+    }
   );
 
   if (!isEnabled) return null;
@@ -73,7 +85,12 @@ export const QuartilesChart: React.FC<Props> = ({
   return (
     <Card className="p-4">
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold">PR Score Quartiles</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-lg font-semibold">PR Score Quartiles</h3>
+          {isRunning && (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          )}
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {quartiles.map((quartile) => (
             <QuartileCard

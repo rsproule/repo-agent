@@ -445,13 +445,6 @@ export async function getQuartiles(
   repo: string,
   preFilters: AttributionPreFilters = {},
 ): Promise<Quartile[]> {
-  console.log(
-    "DEBUG: Getting quartiles for",
-    owner,
-    repo,
-    "with preFilters:",
-    preFilters,
-  );
 
   // Build time filter conditions
   const timeFilters: string[] = [];

@@ -1,5 +1,5 @@
 import { getUser } from "@/echo";
-import { getAttributionByUser } from "@/lib/attribution";
+import { getAttributionByUser, type AttributionPreFilters, type AttributionPostFilters } from "@/lib/attribution";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
@@ -26,7 +26,7 @@ export async function GET(req: Request) {
       );
     }
 
-    const postFilters: any = {};
+    const postFilters: AttributionPostFilters = {};
     if (initBucket) {
       postFilters.initBucket = parseInt(initBucket);
     }
@@ -34,7 +34,7 @@ export async function GET(req: Request) {
       postFilters.userId = userId;
     }
 
-    const preFilters: any = {};
+    const preFilters: AttributionPreFilters = {};
     if (minTime) {
       preFilters.minTime = minTime;
     }

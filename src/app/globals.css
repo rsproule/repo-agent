@@ -1,102 +1,7 @@
-@import 'tailwindcss';
-@import 'tw-animate-css';
-
+@import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
-
-/*
-  The default border color has changed to `currentcolor` in Tailwind CSS v4,
-  so we've added these compatibility styles to make sure everything still
-  looks the same as it did with Tailwind CSS v3.
-
-  If we ever want to remove these styles, we need to add an explicit border
-  color utility to any element that depends on these defaults.
-*/
-@layer base {
-  *,
-  ::after,
-  ::before,
-  ::backdrop,
-  ::file-selector-button {
-    border-color: var(--color-gray-200, currentcolor);
-  }
-}
-
-@utility slide-in-left {
-  animation: slideInLeft 0.7s ease-out forwards;
-}
-
-@utility slide-in-right {
-  animation: slideInRight 0.7s ease-out forwards;
-}
-
-@utility zoom-in {
-  animation: zoomIn 0.7s ease-out forwards;
-}
-
-@utility gradient-border-wrapper {
-  /* Add new styles for gradient border */
-  background-clip: padding-box;
-  border-radius: var(--radius);
-}
-
-@utility animate-shimmer {
-  animation: shimmer 5s infinite;
-}
-
-@utility animate-marquee {
-  animation: marquee var(--duration) linear infinite;
-}
-
-@utility animate-marquee-vertical {
-  animation: marquee-vertical var(--duration) linear infinite;
-}
-
-@utility direction-reverse {
-  animation-direction: reverse;
-}
-
-@utility animate-pulse-shadow {
-  animation: pulseShadow var(--duration) infinite;
-}
-
-@layer utilities {
-  html {
-    @apply font-sans;
-  }
-
-  .bg-primary-15 {
-    background-color: color-mix(in srgb, oklch(0.6483 0.124 226.05) 15%, transparent);
-  }
-
-  .bg-primary-30 {
-    background-color: color-mix(in srgb, oklch(0.6483 0.124 226.05) 30%, transparent);
-  }
-
-  .bg-primary-60 {
-    background-color: color-mix(in srgb, oklch(0.6483 0.124 226.05) 60%, transparent);
-  }
-
-  .bg-primary-100 {
-    background-color: oklch(0.6483 0.124 226.05);
-  }
-
-  .dark .bg-primary-15 {
-    background-color: color-mix(in srgb, oklch(0.6293 0.109 210.87) 15%, transparent);
-  }
-
-  .dark .bg-primary-30 {
-    background-color: color-mix(in srgb, oklch(0.6293 0.109 210.87) 30%, transparent);
-  }
-
-  .dark .bg-primary-60 {
-    background-color: color-mix(in srgb, oklch(0.6293 0.109 210.87) 60%, transparent);
-  }
-
-  .dark .bg-primary-100 {
-    background-color: oklch(0.6293 0.109 210.87);
-  }
-}
 
 :root {
   --background: oklch(0.99 0 0);
@@ -131,32 +36,27 @@
   --sidebar-accent-foreground: oklch(0 0 0);
   --sidebar-border: oklch(0.94 0 0);
   --sidebar-ring: oklch(0 0 0);
-  --font-sans: 'HelveticaNowDisplay', sans-serif;
-  --font-serif: 'HelveticaNowDisplay', serif;
+  --font-sans: "HelveticaNowDisplay", sans-serif;
+  --font-serif: "HelveticaNowDisplay", serif;
   --font-mono: Geist Mono, monospace;
   --radius: 0.5rem;
   --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.09);
   --shadow-xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.09);
-  --shadow-sm:
-    0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 1px 2px -1px hsl(0 0% 0% / 0.18);
-  --shadow:
-    0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 1px 2px -1px hsl(0 0% 0% / 0.18);
-  --shadow-md:
-    0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 2px 4px -1px hsl(0 0% 0% / 0.18);
-  --shadow-lg:
-    0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 4px 6px -1px hsl(0 0% 0% / 0.18);
-  --shadow-xl:
-    0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 8px 10px -1px hsl(0 0% 0% / 0.18);
+  --shadow-sm: 0px 1px 2px 0px hsl(0 0% 0% / 0.18),
+    0px 1px 2px -1px hsl(0 0% 0% / 0.18);
+  --shadow: 0px 1px 2px 0px hsl(0 0% 0% / 0.18),
+    0px 1px 2px -1px hsl(0 0% 0% / 0.18);
+  --shadow-md: 0px 1px 2px 0px hsl(0 0% 0% / 0.18),
+    0px 2px 4px -1px hsl(0 0% 0% / 0.18);
+  --shadow-lg: 0px 1px 2px 0px hsl(0 0% 0% / 0.18),
+    0px 4px 6px -1px hsl(0 0% 0% / 0.18);
+  --shadow-xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.18),
+    0px 8px 10px -1px hsl(0 0% 0% / 0.18);
   --shadow-2xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.45);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
   /* Fumadocs-specific secondary color override for light mode */
   --color-fd-secondary: oklch(0.98 0 0);
-  /* Attribution bar colors */
-  --primary-15: oklch(0.6483 0.124 226.05 / 0.15);
-  --primary-30: oklch(0.6483 0.124 226.05 / 0.30);
-  --primary-60: oklch(0.6483 0.124 226.05 / 0.60);
-  --primary-100: oklch(0.6483 0.124 226.05);
 }
 
 .dark {
@@ -192,30 +92,25 @@
   --sidebar-accent-foreground: oklch(1 0 0);
   --sidebar-border: oklch(0.32 0 0);
   --sidebar-ring: oklch(0.72 0 0);
-  --font-sans: 'HelveticaNowDisplay', sans-serif;
-  --font-serif: 'HelveticaNowDisplay', serif;
+  --font-sans: "HelveticaNowDisplay", sans-serif;
+  --font-serif: "HelveticaNowDisplay", serif;
   --font-mono: Geist Mono, monospace;
   --radius: 0.5rem;
   --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.09);
   --shadow-xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.09);
-  --shadow-sm:
-    0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 1px 2px -1px hsl(0 0% 0% / 0.18);
-  --shadow:
-    0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 1px 2px -1px hsl(0 0% 0% / 0.18);
-  --shadow-md:
-    0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 2px 4px -1px hsl(0 0% 0% / 0.18);
-  --shadow-lg:
-    0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 4px 6px -1px hsl(0 0% 0% / 0.18);
-  --shadow-xl:
-    0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 8px 10px -1px hsl(0 0% 0% / 0.18);
+  --shadow-sm: 0px 1px 2px 0px hsl(0 0% 0% / 0.18),
+    0px 1px 2px -1px hsl(0 0% 0% / 0.18);
+  --shadow: 0px 1px 2px 0px hsl(0 0% 0% / 0.18),
+    0px 1px 2px -1px hsl(0 0% 0% / 0.18);
+  --shadow-md: 0px 1px 2px 0px hsl(0 0% 0% / 0.18),
+    0px 2px 4px -1px hsl(0 0% 0% / 0.18);
+  --shadow-lg: 0px 1px 2px 0px hsl(0 0% 0% / 0.18),
+    0px 4px 6px -1px hsl(0 0% 0% / 0.18);
+  --shadow-xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.18),
+    0px 8px 10px -1px hsl(0 0% 0% / 0.18);
   --shadow-2xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.45);
   /* Fumadocs-specific secondary color override for dark mode */
   --color-fd-secondary: oklch(0.25 0 0);
-  /* Attribution bar colors for dark mode */
-  --primary-15: oklch(0.6293 0.109 210.87 / 0.15);
-  --primary-30: oklch(0.6293 0.109 210.87 / 0.30);
-  --primary-60: oklch(0.6293 0.109 210.87 / 0.60);
-  --primary-100: oklch(0.6293 0.109 210.87);
 }
 
 @theme inline {
@@ -269,168 +164,7 @@
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
-  --animate-aurora: aurora 8s ease-in-out infinite alternate;
-  @keyframes aurora {
-    0% {
-      background-position: 0% 50%;
-      transform: rotate(-5deg) scale(0.9);
-    }
-    25% {
-      background-position: 50% 100%;
-      transform: rotate(5deg) scale(1.1);
-    }
-    50% {
-      background-position: 100% 50%;
-      transform: rotate(-3deg) scale(0.95);
-    }
-    75% {
-      background-position: 50% 0%;
-      transform: rotate(3deg) scale(1.05);
-    }
-    100% {
-      background-position: 0% 50%;
-      transform: rotate(-5deg) scale(0.9);
-    }
-  }
-  --animate-shimmer-slide: shimmer-slide var(--speed) ease-in-out infinite
-    alternate;
-  --animate-spin-around: spin-around calc(var(--speed) * 2) infinite linear;
-  @keyframes shimmer-slide {
-    to {
-      transform: translate(calc(100cqw - 100%), 0);
-    }
-  }
-  @keyframes spin-around {
-    0% {
-      transform: translateZ(0) rotate(0);
-    }
-    15%,
-    35% {
-      transform: translateZ(0) rotate(90deg);
-    }
-    65%,
-    85% {
-      transform: translateZ(0) rotate(270deg);
-    }
-    100% {
-      transform: translateZ(0) rotate(360deg);
-    }
-  }
-  --animate-marquee: marquee var(--duration) infinite linear;
-  --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
-  @keyframes marquee {
-    from {
-      transform: translateX(0);
-    }
-    to {
-      transform: translateX(calc(-100% - var(--gap)));
-    }
-  }
-  @keyframes marquee-vertical {
-    from {
-      transform: translateY(0);
-    }
-    to {
-      transform: translateY(calc(-100% - var(--gap)));
-    }
-  }
 }
-
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-}
-
-@layer utilities {
-  @keyframes slideInLeft {
-    from {
-      transform: translateX(-100%);
-      opacity: 0;
-    }
-    to {
-      transform: translateX(0);
-      opacity: 1;
-    }
-  }
-
-  @keyframes slideInRight {
-    from {
-      transform: translateX(100%);
-      opacity: 0;
-    }
-    to {
-      transform: translateX(0);
-      opacity: 1;
-    }
-  }
-  @keyframes zoomIn {
-    from {
-      transform: scale(0);
-      opacity: 0;
-    }
-    to {
-      transform: scale(1);
-      opacity: 1;
-    }
-  }
-
-  @keyframes shimmer {
-    0%,
-    100% {
-      transform: translateX(-100%);
-      opacity: 0;
-    }
-    50% {
-      transform: translateX(100%);
-      opacity: 1;
-    }
-  }
-
-  @keyframes marquee {
-    0% {
-      transform: translateX(0%);
-    }
-    100% {
-      transform: translateX(-100%);
-    }
-  }
-
-  @keyframes marquee-vertical {
-    0% {
-      transform: translateY(0%);
-    }
-    100% {
-      transform: translateY(-100%);
-    }
-  }
-
-  @keyframes pulseShadow {
-    0%,
-    100% {
-      box-shadow: 0 0 0 0 var(--pulse-color);
-    }
-    50% {
-      box-shadow: 0 0 0 var(--pulse-size) var(--pulse-color);
-    }
-  }
-}
-
-.no-scrollbar {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-/*
-  ---break---
-*/
 
 @layer base {
   * {
@@ -438,11 +172,6 @@
   }
   body {
     @apply bg-background text-foreground;
+    letter-spacing: var(--tracking-normal);
   }
-}
-
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation: none;
-  mix-blend-mode: normal;
 }

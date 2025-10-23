@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { getInstallationTokenForRepo } from "@/lib/github";
+import { getInstallationTokenForUser } from "@/lib/github";
 import { defaultLogger, type Logger } from "@/lib/logger";
 import { err, ok, Result, ResultAsync } from "neverthrow";
 import { Octokit } from "octokit";
@@ -785,7 +785,7 @@ async function getOctokitResult(
   }
 
   const tokenResult = await ResultAsync.fromPromise(
-    getInstallationTokenForRepo(config.owner, config.repo),
+    getInstallationTokenForUser(config.echoUserId),
     (e) => ({
       type: "Auth" as const,
       cause: e instanceof Error ? e : new Error(String(e)),

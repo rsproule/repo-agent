@@ -332,8 +332,8 @@ const TooltipContent: React.FC<TooltipContentProps> = ({
     repo.owner.login,
     repo.name,
     {
-      min_time: startDate.toISOString(),
-      max_time: endDate.toISOString(),
+      minTime: startDate.toISOString(),
+      maxTime: endDate.toISOString(),
     },
   );
 

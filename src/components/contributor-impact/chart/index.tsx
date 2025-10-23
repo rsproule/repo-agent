@@ -15,6 +15,7 @@ import {
   subYears,
   startOfDay,
   min,
+  max,
   subDays,
 } from "date-fns";
 
@@ -115,24 +116,62 @@ const TimeRangeFilterChartBody: React.FC<ChartProps> = ({
   handleMouseUp,
   height = 200,
 }) => {
-  const [endWindow] = useState<Date>(new Date());
-  const [startWindow, setStartWindow] = useState<Date>(subYears(endWindow, 1));
+  // Calculate window bounds directly from the data
+  const { startWindow, endWindow } = useMemo(() => {
+    if (!data.buckets || data.buckets.length === 0) {
+      // Fallback to default bounds when no data
+      const defaultEnd = new Date();
+      const defaultStart = repo.created_at
+        ? min([startOfDay(new Date(repo.created_at)), subDays(defaultEnd, 7)])
+        : subYears(defaultEnd, 1);
+
+      return {
+        startWindow: defaultStart,
+        endWindow: defaultEnd,
+      };
+    }
+
+    // Calculate bounds from actual data
+    const dataBounds = data.buckets.reduce(
+      (bounds, bucket) => {
+        const bucketStart = new Date(bucket.bucket_start);
+        const bucketEnd = new Date(bucket.bucket_end);
+        return {
+          earliest: bounds.earliest ? min([bounds.earliest, bucketStart]) : bucketStart,
+          latest: bounds.latest ? max([bounds.latest, bucketEnd]) : bucketEnd,
+        };
+      },
+      { earliest: null as Date | null, latest: null as Date | null }
+    );
+
+    // Ensure we have valid bounds
+    if (!dataBounds.earliest || !dataBounds.latest) {
+      const defaultEnd = new Date();
+      const defaultStart = repo.created_at
+        ? min([startOfDay(new Date(repo.created_at)), subDays(defaultEnd, 7)])
+        : subYears(defaultEnd, 1);
+
+      return {
+        startWindow: defaultStart,
+        endWindow: defaultEnd,
+      };
+    }
+
+    // Respect repo creation date as minimum bound
+    const repoCreationDate = repo.created_at ? new Date(repo.created_at) : null;
+    const effectiveStart = repoCreationDate
+      ? min([repoCreationDate, dataBounds.earliest])
+      : dataBounds.earliest;
+
+    return {
+      startWindow: effectiveStart,
+      endWindow: dataBounds.latest,
+    };
+  }, [data.buckets, repo.created_at]);
 
   const numBuckets = useMemo(() => {
     return Math.min(numBucketsProp, differenceInDays(endWindow, startWindow));
   }, [endWindow, startWindow, numBucketsProp]);
-
-  useEffect(() => {
-    if (months === 0) {
-      setStartWindow(
-        repo.created_at
-          ? min([startOfDay(new Date(repo.created_at)), subDays(new Date(), 7)])
-          : startOfDay(new Date()),
-      );
-    } else {
-      setStartWindow(subMonths(endWindow, months));
-    }
-  }, [months, endWindow, repo.created_at]);
 
   // Transform pre-aggregated bucket data into chart format with consistent bucket sizes
   const chartData = useMemo(() => {
@@ -225,12 +264,14 @@ const TimeRangeFilterChartBody: React.FC<ChartProps> = ({
     });
 
     // Convert to array and sort by start date ascending, but use end date for chart x-axis
-    return Array.from(buckets.values())
+    const result = Array.from(buckets.values())
       .sort((a, b) => a.key - b.key)
       .map((bucket) => ({
         ...bucket,
         date: bucket.endDate.getTime(), // Use end date for X-axis positioning
       }));
+
+    return result;
   }, [data.buckets, numBuckets, startWindow, endWindow]);
 
   const getBarColor = useCallback(
@@ -365,6 +406,7 @@ const TooltipContent: React.FC<TooltipContentProps> = ({
     startDate.toISOString(),
     endDate.toISOString(),
   );
+
 
   const countRef = useRef<number>();
 

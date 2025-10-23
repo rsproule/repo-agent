@@ -243,13 +243,13 @@ const LoadingUserRow: React.FC = () => {
       className="flex gap-2 w-full max-w-full overflow-hidden items-center px-1"
       style={{ height: '36px', marginBottom: '8px' }}
     >
-      <div className="size-7 bg-primary rounded-full animate-pulse" />
+      <div className="size-7 bg-muted rounded-full animate-pulse" />
       <div className="flex flex-1 overflow-hidden gap-1 w-full flex-row items-center justify-between">
         <VStack className="w-full items-start">
-          <div className="h-[14px] w-24 bg-primary rounded animate-pulse" />
-          <div className="h-3 w-8 bg-primary rounded animate-pulse" />
+          <div className="h-[14px] w-24 bg-muted rounded animate-pulse" />
+          <div className="h-3 w-8 bg-muted rounded animate-pulse" />
         </VStack>
-        <div className="h-2 w-32 md:w-48 bg-primary rounded animate-pulse" />
+        <div className="h-2 w-32 md:w-48 bg-muted rounded animate-pulse" />
       </div>
     </div>
   );

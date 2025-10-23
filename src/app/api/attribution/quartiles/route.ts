@@ -1,5 +1,5 @@
 import { getUser } from "@/echo";
-import { getQuartiles } from "@/lib/attribution";
+import { getQuartiles, type AttributionPreFilters } from "@/lib/attribution";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
@@ -22,7 +22,7 @@ export async function GET(req: Request) {
       );
     }
 
-    const preFilters: any = {};
+    const preFilters: AttributionPreFilters = {};
     if (minTime) {
       preFilters.minTime = minTime;
     }

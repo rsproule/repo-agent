@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import React, { useState } from "react";
 import { GitPullRequest } from "lucide-react";
-import { PrGraph } from "./pr-graph";
-import { Contributors } from "./contributors";
+import React, { useState } from "react";
 import { TopPrs } from "../prs";
+import { Contributors } from "./contributors";
+import { PrGraph } from "./pr-graph";
 
 interface Repository {
   owner: { login: string };
@@ -35,7 +35,8 @@ export const ContributorImpact: React.FC<Props> = ({ repo }) => {
             ?
           </div>
           <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-            Merit analyzes the impact of each merged pull request and aggregates across all contributors.
+            Merit analyzes the impact of each merged pull request and aggregates
+            across all contributors.
           </div>
         </div>
       </div>
@@ -58,9 +59,9 @@ const ContributorImpactBody: React.FC<{
       : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   });
 
-  const [filterUser, setFilterUser] = useState<
-    UserFilter | undefined
-  >(undefined);
+  const [filterUser, setFilterUser] = useState<UserFilter | undefined>(
+    undefined,
+  );
 
   return (
     <div className="flex flex-col gap-2">
@@ -83,18 +84,29 @@ const ContributorImpactBody: React.FC<{
           repo={{ ...repo, id: 1 }}
           minTime={minTime.toISOString()}
           maxTime={maxTime.toISOString()}
-          filterUser={filterUser ? {
-            id: filterUser.id.toString(),
-            login: filterUser.login,
-            avatar_url: filterUser.avatar_url,
-            total_prs: 0,
-            merged_prs: 0,
-          } : undefined}
-          setFilterUser={(user) => setFilterUser(user ? {
-            id: typeof user.id === 'string' ? parseInt(user.id) : user.id,
-            login: user.login,
-            avatar_url: user.avatar_url,
-          } : undefined)}
+          filterUser={
+            filterUser
+              ? {
+                  id: filterUser.id.toString(),
+                  login: filterUser.login,
+                  avatar_url: filterUser.avatar_url,
+                  total_prs: 0,
+                  merged_prs: 0,
+                }
+              : undefined
+          }
+          setFilterUser={(user) =>
+            setFilterUser(
+              user
+                ? {
+                    id:
+                      typeof user.id === "string" ? parseInt(user.id) : user.id,
+                    login: user.login,
+                    avatar_url: user.avatar_url,
+                  }
+                : undefined,
+            )
+          }
         />
       </div>
     </div>

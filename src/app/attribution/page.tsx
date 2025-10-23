@@ -9,12 +9,25 @@ import type {
   AttributionPreFilters,
 } from "@/lib/attribution";
 import { useRepositoryMetadata } from "@/hooks/use-attribution";
+import { useJobStatus } from "@/hooks/use-job-status";
 import { useState } from "react";
+import { Loader2, Database, Zap } from "lucide-react";
 
 export default function AttributionPage() {
   const [owner, setOwner] = useState("merit-systems");
   const [repo, setRepo] = useState("echo");
-  const [isEnabled, setIsEnabled] = useState(false);
+  const isEnabled = !!(owner && repo); // Auto-enable when both fields have values
+
+  // Get job status with faster polling
+  const {
+    isRunning,
+    anyRunningJob
+  } = useJobStatus(owner, repo, {
+    refreshInterval: 2000, // Poll every 2 seconds
+    enabled: !!owner && !!repo
+  });
+
+  const [syncLoading, setSyncLoading] = useState(false);
 
   // Fetch real repository metadata
   const { data: repoMetadata, isLoading: isLoadingRepo } =
@@ -29,8 +42,30 @@ export default function AttributionPage() {
     // Can add bucket percentage overrides here if needed
   };
 
-  const handleFetch = () => {
-    setIsEnabled(true);
+
+  const handleSync = async () => {
+    if (!owner || !repo) return;
+
+    setSyncLoading(true);
+    try {
+      const response = await fetch('/api/trigger/sync-and-bucket-prs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ owner, repo, fullResync: false }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log('Sync pipeline started! Task ID:', data.taskId);
+      } else {
+        console.error('Failed to start sync:', data.error);
+      }
+    } catch (error) {
+      console.error('Failed to start sync:', error);
+    } finally {
+      setSyncLoading(false);
+    }
   };
 
   return (
@@ -74,10 +109,32 @@ export default function AttributionPage() {
                   placeholder="Repository name"
                 />
               </div>
-              <Button onClick={handleFetch} disabled={!owner || !repo}>
-                Load Attribution Data
-              </Button>
+              {isEnabled && (
+                <Button
+                  onClick={handleSync}
+                  disabled={!owner || !repo || syncLoading || isRunning}
+                  size="sm"
+                >
+                  {syncLoading || isRunning ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Database className="h-4 w-4 mr-2" />
+                  )}
+                  {syncLoading || isRunning ? 'Syncing...' : 'Sync'}
+                </Button>
+              )}
             </div>
+
+            {isRunning && (
+              <div className="flex items-center gap-2 text-sm text-blue-600 pt-2">
+                <span>
+                  {anyRunningJob?.jobType === 'sync-prs' ? 'Syncing PRs...' :
+                   anyRunningJob?.jobType === 'bucket-prs' ? 'Bucketing PRs...' :
+                   anyRunningJob?.jobType === 'sync-and-bucket-prs' ? 'Running pipeline...' :
+                   'Processing...'}
+                </span>
+              </div>
+            )}
           </div>
         </Card>
       </div>

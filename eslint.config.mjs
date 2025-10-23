@@ -1,5 +1,7 @@
 import { FlatCompat } from "@eslint/eslintrc";
-import neverthrow from "eslint-plugin-neverthrow";
+import neverthrowMustUse from "eslint-plugin-neverthrow-must-use";
+import tsPlugin from "@typescript-eslint/eslint-plugin";
+import tsParser from "@typescript-eslint/parser";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -13,11 +15,22 @@ const compat = new FlatCompat({
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
+    files: ["src/**/*.{ts,tsx}"],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        ecmaVersion: "latest",
+        sourceType: "module",
+        project: "./tsconfig.json",
+        tsconfigRootDir: process.cwd(),
+      },
+    },
     plugins: {
-      neverthrow,
+      "@typescript-eslint": tsPlugin,
+      "neverthrow-must-use": neverthrowMustUse,
     },
     rules: {
-      "neverthrow/must-use-result": "error",
+      "neverthrow-must-use/must-use-result": "error",
     },
   },
   {
@@ -27,6 +40,7 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      ".trigger/**",
     ],
   },
 ];

@@ -1,24 +1,16 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import type {
-  UserPct,
+  UserAttribution,
   PRAttribution,
   Quartile,
   PaginatedResponse,
   AttributionPreFilters,
   AttributionPostFilters,
   AttributionOverrides,
-} from '@/types/attribution';
-
-// Import existing API types
-import type {
-  UserAttribution,
-  PRAttribution as ExistingPRAttribution,
-  Quartile as ExistingQuartile,
-  PaginatedResponse as ExistingPaginatedResponse,
 } from '@/lib/attribution';
 
 interface InfiniteQueryResult<T> {
-  pages: ExistingPaginatedResponse<T>[];
+  pages: PaginatedResponse<T>[];
   pageParams: any[];
 }
 
@@ -59,7 +51,7 @@ export function useAttributionByPr(
     initialPageParam?: { page: number; page_size: number };
   }
 ) {
-  return useInfiniteQuery<ExistingPaginatedResponse<ExistingPRAttribution>, Error, InfiniteQueryResult<ExistingPRAttribution>>({
+  return useInfiniteQuery<PaginatedResponse<PRAttribution>, Error, InfiniteQueryResult<PRAttribution>>({
     queryKey: ['attribution', 'by-pr', owner, repo, preFilters, postFilters, overrides],
     queryFn: async ({ pageParam = options?.initialPageParam || { page: 1, page_size: 20 } }) => {
       return fetchWithQuery(`${API_BASE}/by-pr`, {
@@ -67,8 +59,8 @@ export function useAttributionByPr(
         repo,
         page: pageParam.page,
         pageSize: pageParam.page_size,
-        initBucket: postFilters?.init_bucket,
-        userId: postFilters?.user_id?.toString(),
+        initBucket: postFilters?.initBucket,
+        userId: postFilters?.userId?.toString(),
         ...preFilters,
         ...overrides,
       });
@@ -93,9 +85,10 @@ export function useAggregateCaptable(
   options?: {
     enabled?: boolean;
     initialPageParam?: { page: number; page_size: number };
+    refreshInterval?: number;
   }
 ) {
-  return useInfiniteQuery<ExistingPaginatedResponse<UserAttribution>, Error, InfiniteQueryResult<UserAttribution>>({
+  return useInfiniteQuery<PaginatedResponse<UserAttribution>, Error, InfiniteQueryResult<UserAttribution>>({
     queryKey: ['attribution', 'by-user', owner, repo, preFilters, postFilters, overrides],
     queryFn: async ({ pageParam = options?.initialPageParam || { page: 1, page_size: 30 } }) => {
       return fetchWithQuery(`${API_BASE}/by-user`, {
@@ -103,8 +96,8 @@ export function useAggregateCaptable(
         repo,
         page: pageParam.page,
         pageSize: pageParam.page_size,
-        initBucket: postFilters?.init_bucket,
-        userId: postFilters?.user_id?.toString(),
+        initBucket: postFilters?.initBucket,
+        userId: postFilters?.userId?.toString(),
         ...preFilters,
         ...overrides,
       });
@@ -117,6 +110,7 @@ export function useAggregateCaptable(
       return undefined;
     },
     initialPageParam: options?.initialPageParam || { page: 1, page_size: 30 },
+    refetchInterval: options?.refreshInterval,
   });
 }
 
@@ -126,9 +120,9 @@ export function useAttributionQuartiles(
   preFilters?: AttributionPreFilters,
   postFilters?: AttributionPostFilters,
   overrides?: AttributionOverrides,
-  options?: { enabled?: boolean }
+  options?: { enabled?: boolean; refreshInterval?: number }
 ) {
-  return useQuery<ExistingQuartile[], Error>({
+  return useQuery<Quartile[], Error>({
     queryKey: ['attribution', 'quartiles', owner, repo, preFilters, postFilters, overrides],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -136,8 +130,8 @@ export function useAttributionQuartiles(
         repo,
       });
 
-      if (preFilters?.min_time) params.append("minTime", preFilters.min_time);
-      if (preFilters?.max_time) params.append("maxTime", preFilters.max_time);
+      if (preFilters?.minTime) params.append("minTime", preFilters.minTime);
+      if (preFilters?.maxTime) params.append("maxTime", preFilters.maxTime);
 
       const response = await fetch(`/api/attribution/quartiles?${params}`);
 
@@ -149,6 +143,7 @@ export function useAttributionQuartiles(
       return response.json();
     },
     enabled: options?.enabled !== false && !!owner && !!repo,
+    refetchInterval: options?.refreshInterval,
   });
 }
 
@@ -159,7 +154,7 @@ export function useQuartilesByTime(
   maxTime?: string,
   options?: { enabled?: boolean }
 ) {
-  return useQuery<ExistingQuartile[], Error>({
+  return useQuery<Quartile[], Error>({
     queryKey: ['attribution', 'quartiles-by-time', owner, repo, minTime, maxTime],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -229,7 +224,7 @@ export function usePrAggregation(
   owner: string,
   repo: string,
   params: PrAggregationParams,
-  options?: { enabled?: boolean }
+  options?: { enabled?: boolean; refreshInterval?: number }
 ) {
   return useQuery<PrAggregationResponse, Error>({
     queryKey: ['prs', 'aggregation', owner, repo, params],
@@ -256,6 +251,7 @@ export function usePrAggregation(
       } as PrAggregationResponse;
     },
     enabled: options?.enabled !== false && !!owner && !!repo,
+    refetchInterval: options?.refreshInterval,
   });
 }
 
@@ -303,7 +299,7 @@ export function useRepoSearch(
   params: RepoSearchParams = {},
   options?: { enabled?: boolean }
 ) {
-  return useInfiniteQuery<ExistingPaginatedResponse<UserRepoSearchResult>, Error, InfiniteQueryResult<UserRepoSearchResult>>({
+  return useInfiniteQuery<PaginatedResponse<UserRepoSearchResult>, Error, InfiniteQueryResult<UserRepoSearchResult>>({
     queryKey: ['repos', 'users', owner, repo, params],
     queryFn: async ({ pageParam = { page: 1, page_size: 20 } }) => {
       return fetchWithQuery('/api/repos/users', {

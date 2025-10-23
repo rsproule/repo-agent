@@ -159,6 +159,7 @@ export async function GET(req: Request) {
       },
     };
 
+
     return NextResponse.json(response);
   } catch (error) {
     console.error("PR aggregation error:", error);

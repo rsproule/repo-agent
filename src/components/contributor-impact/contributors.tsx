@@ -9,7 +9,7 @@ interface Repository {
   name: string;
 }
 
-interface UserFilter {
+interface UserRepoSearchResult {
   id: number;
   login: string;
   avatar_url: string;
@@ -19,8 +19,8 @@ interface Props {
   repo: Repository;
   minTime: string;
   maxTime: string;
-  filterUser: UserFilter | undefined;
-  setFilterUser: (user: UserFilter | undefined) => void;
+  filterUser: UserRepoSearchResult | undefined;
+  setFilterUser: (user: UserRepoSearchResult | undefined) => void;
 }
 
 export const Contributors: React.FC<Props> = ({
@@ -40,8 +40,8 @@ export const Contributors: React.FC<Props> = ({
     repo.owner.login,
     repo.name,
     {
-      min_time: minTime,
-      max_time: maxTime,
+      minTime: minTime,
+      maxTime: maxTime,
     },
     undefined,
     undefined,
@@ -54,7 +54,7 @@ export const Contributors: React.FC<Props> = ({
     },
   );
 
-  const cachedData = useRef(captableData);
+  const cachedData = useRef<typeof captableData>(captableData);
 
   useEffect(() => {
     if (captableData) {

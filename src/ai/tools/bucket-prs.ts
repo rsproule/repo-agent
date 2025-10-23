@@ -1,11 +1,16 @@
 import { syncRepoPRs } from "@/ai/tools/sync-prs";
-import { openai } from "@/echo";
 import { prisma } from "@/lib/db";
-import { getInstallationTokenForRepo } from "@/lib/github";
+import { getInstallationTokenForUser } from "@/lib/github";
 import { defaultLogger, type Logger } from "@/lib/logger";
+import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { Octokit } from "octokit";
 import { z } from "zod";
+
+const openai = createOpenAI({
+  apiKey: process.env.ECHO_API_KEY,
+  baseURL: "https://echo.router.merit.systems",
+});
 
 export const BUCKET_CLASSIFIER_VERSION = "v0.0.1";
 const DEFAULT_MODEL = "gpt-4o-2024-11-20";
@@ -264,7 +269,7 @@ export async function bucketPRs(
   const prRange = await prisma.$queryRaw<
     Array<{ min: number; max: number; count: bigint }>
   >`
-    SELECT 
+    SELECT
       MIN(pr_number) as min,
       MAX(pr_number) as max,
       COUNT(*)::bigint as count
@@ -301,7 +306,7 @@ export async function bucketPRs(
   logger.info("Created classification run", { runId: classificationRun.runId });
 
   // Step 4: Get GitHub token and initialize Octokit
-  const token = await getInstallationTokenForRepo(owner, repo);
+  const token = await getInstallationTokenForUser(echoUserId);
   const octokit = new Octokit({ auth: token });
 
   let totalCost = 0;
@@ -384,13 +389,7 @@ export async function bucketPRs(
 
     // Batch insert classifications
     if (bucketEntries.length > 0) {
-      // Insert buckets
-      await prisma.prBucket.createMany({
-        data: bucketEntries,
-        skipDuplicates: true,
-      });
-
-      // Get author info for the PRs
+      // Get author info for the PRs FIRST
       const prNumbers = bucketEntries.map((e) => e.prNumber);
       const prAuthors = await prisma.pullRequestRecord.findMany({
         where: {
@@ -408,7 +407,7 @@ export async function bucketPRs(
         prAuthors.map((pr) => [pr.prNumber, pr.author]),
       );
 
-      // Simultaneously create scores from buckets
+      // Create scores from buckets
       // Bucket → Score mapping: 0→-2.0, 1→-1.0, 2→1.0, 3→2.0
       const scoreEntries = bucketEntries.map((entry) => {
         const score =
@@ -435,11 +434,17 @@ export async function bucketPRs(
         };
       });
 
-      // Insert scores
-      await prisma.prScore.createMany({
-        data: scoreEntries,
-        skipDuplicates: true,
-      });
+      // Insert both buckets AND scores in single transaction to ensure atomicity
+      await prisma.$transaction([
+        prisma.prBucket.createMany({
+          data: bucketEntries,
+          skipDuplicates: true,
+        }),
+        prisma.prScore.createMany({
+          data: scoreEntries,
+          skipDuplicates: true,
+        }),
+      ]);
 
       totalCost += batchCost;
       totalProcessed += bucketEntries.length;

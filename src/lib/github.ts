@@ -1,5 +1,6 @@
 import { createAppAuth } from "@octokit/auth-app";
 import { Octokit } from "octokit";
+import { prisma } from "@/lib/db";
 
 export function getEnv(name: string, required = true): string | undefined {
   const value = process.env[name];
@@ -20,10 +21,24 @@ export function getGitHubAppInstallUrl(): string {
   return `https://github.com/apps/${slug}/installations/new`;
 }
 
-export async function getInstallationTokenForRepo(
-  owner: string,
-  repo: string,
+export async function getInstallationTokenForUser(
+  echoUserId: string,
 ): Promise<string> {
+  // Get user's GitHub installations from database
+  const installation = await prisma.githubInstallation.findFirst({
+    where: {
+      echoUserId,
+    },
+  });
+
+  if (!installation) {
+    throw new Error(
+      `No GitHub installation found for user ${echoUserId}. ` +
+      `Please install the app at: ${getGitHubAppInstallUrl()}`
+    );
+  }
+
+  // Create GitHub App Octokit instance
   const octokit = new Octokit({
     authStrategy: createAppAuth,
     auth: {
@@ -32,22 +47,51 @@ export async function getInstallationTokenForRepo(
     },
   });
 
-  // Get installation for the repo
-  const installation = await octokit.request(
-    "GET /repos/{owner}/{repo}/installation",
-    {
-      owner,
-      repo,
-    },
-  );
-
   // Create installation access token
   const tokenResponse = await octokit.request(
     "POST /app/installations/{installation_id}/access_tokens",
     {
-      installation_id: installation.data.id,
+      installation_id: Number(installation.installationId),
     },
   );
 
   return tokenResponse.data.token;
+}
+
+export async function getInstallationTokenForRepo(
+  owner: string,
+  repo: string,
+): Promise<string> {
+  // This is the legacy function - we should migrate to getInstallationTokenForUser
+  const octokit = new Octokit({
+    authStrategy: createAppAuth,
+    auth: {
+      appId: getEnv("GITHUB_APP_ID")!,
+      privateKey: normalizePrivateKey(getEnv("GITHUB_APP_PRIVATE_KEY")!),
+    },
+  });
+
+  try {
+    const installation = await octokit.request(
+      "GET /repos/{owner}/{repo}/installation",
+      {
+        owner,
+        repo,
+      },
+    );
+
+    const tokenResponse = await octokit.request(
+      "POST /app/installations/{installation_id}/access_tokens",
+      {
+        installation_id: installation.data.id,
+      },
+    );
+
+    return tokenResponse.data.token;
+  } catch (error: any) {
+    throw new Error(
+      `GitHub App is not installed on repository ${owner}/${repo}. ` +
+      `Please install the app at: ${getGitHubAppInstallUrl()}`
+    );
+  }
 }
