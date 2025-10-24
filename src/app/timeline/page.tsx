@@ -1,12 +1,15 @@
 "use client";
 
 import { ContributorsList } from "@/components/contributor-impact/contributors-list";
+import { TopEarnersLeaderboard } from "@/components/timeline/top-earners-leaderboard";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { useEthPrices } from "@/hooks/use-eth-prices";
 import useJobStatus from "@/hooks/use-job-status";
 import { usePrRange } from "@/hooks/use-timeline-attribution";
 import { useTimelineReadiness } from "@/hooks/use-timeline-readiness";
 import type { PaginatedResponse, UserAttribution } from "@/lib/attribution";
+import { calculateWalletBalances } from "@/lib/eth-wallet-calculator";
 import { calculateTimelineAttribution } from "@/lib/timeline-calculator";
 import {
   ChevronsLeft,
@@ -40,6 +43,28 @@ const TimelinePage = React.memo(function TimelinePage() {
   const [isPreloading, setIsPreloading] = useState(false);
   const [justTriggered, setJustTriggered] = useState(false);
   const [skipLows, setSkipLows] = useState(true); // On by default
+
+  // Base bucket rewards (in USD) - these maintain the ratios
+  const BASE_REWARDS = {
+    0: 0.01, // Low
+    1: 0.1, // Medium
+    2: 0.3, // High
+    3: 0.8, // Exceptional
+  };
+
+  // Multiplier for all rewards (adjustable via slider)
+  const [rewardMultiplier, setRewardMultiplier] = useState(1);
+
+  // Calculated bucket rewards based on multiplier
+  const bucketRewards = useMemo(
+    () => ({
+      0: BASE_REWARDS[0] * rewardMultiplier,
+      1: BASE_REWARDS[1] * rewardMultiplier,
+      2: BASE_REWARDS[2] * rewardMultiplier,
+      3: BASE_REWARDS[3] * rewardMultiplier,
+    }),
+    [rewardMultiplier],
+  );
 
   // Track bucket job status
   const { isRunning: isBucketingRunning, bucketJob } = useJobStatus(
@@ -97,6 +122,7 @@ const TimelinePage = React.memo(function TimelinePage() {
     author: string;
     bucket: number;
     score: number;
+    mergedAt: string | null;
   }> | null>(() => {
     if (typeof window === "undefined") return null;
     try {
@@ -106,6 +132,107 @@ const TimelinePage = React.memo(function TimelinePage() {
       return null;
     }
   });
+
+  // Auto-load raw scores on mount (needed for ETH price calculations)
+  useEffect(() => {
+    if (!rawScores && owner && repo && readiness?.isReady) {
+      const loadScores = async () => {
+        try {
+          const response = await fetch(
+            `/api/attribution/timeline/scores?owner=${owner}&repo=${repo}`,
+          );
+          if (response.ok) {
+            const data = await response.json();
+            setRawScores(data.scores);
+            // Cache in localStorage
+            try {
+              localStorage.setItem(
+                scoresStorageKey,
+                JSON.stringify(data.scores),
+              );
+            } catch {}
+          }
+        } catch (error) {
+          console.error("Failed to auto-load scores:", error);
+        }
+      };
+      loadScores();
+    }
+  }, [rawScores, owner, repo, readiness, scoresStorageKey]);
+
+  // Get date range for ETH prices
+  const minDate = useMemo(() => {
+    if (!rawScores || rawScores.length === 0) return null;
+    const datesWithMerge = rawScores
+      .filter((s) => s.mergedAt)
+      .map((s) => s.mergedAt!);
+    if (datesWithMerge.length === 0) return null;
+    const minDateStr = datesWithMerge.sort()[0];
+    return minDateStr ? new Date(minDateStr) : null;
+  }, [rawScores]);
+
+  const maxDate = useMemo(() => {
+    if (!rawScores || rawScores.length === 0) return null;
+    const datesWithMerge = rawScores
+      .filter((s) => s.mergedAt)
+      .map((s) => s.mergedAt!);
+    if (datesWithMerge.length === 0) return null;
+    const maxDateStr = datesWithMerge.sort().reverse()[0];
+    return maxDateStr ? new Date(maxDateStr) : null;
+  }, [rawScores]);
+
+  // Fetch ETH prices for the PR date range
+  const { data: ethPricesData } = useEthPrices(minDate, maxDate, {
+    enabled: !!rawScores && !!minDate && !!maxDate,
+  });
+
+  // Get current ETH price (use latest available)
+  const currentEthPrice = ethPricesData?.prices
+    ? Object.values(ethPricesData.prices).slice(-1)[0] || 3000
+    : 3000;
+
+  // Get ETH price at current PR's merge time
+  const currentPrData = useMemo(() => {
+    if (!ethPricesData?.prices || !rawScores || currentPrNumber === 0) {
+      return null;
+    }
+    const prScore = rawScores.find((s) => s.prNumber === currentPrNumber);
+    if (!prScore?.mergedAt) {
+      return null;
+    }
+
+    const mergeDateStr = prScore.mergedAt.split("T")[0]; // YYYY-MM-DD
+    let price = ethPricesData.prices[mergeDateStr];
+    const mergeDate = new Date(prScore.mergedAt);
+
+    // If no price for that exact date, find the nearest price in time
+    if (!price || price <= 0) {
+      const sortedDates = Object.keys(ethPricesData.prices).sort();
+
+      // Look for the closest earlier date
+      for (let i = sortedDates.length - 1; i >= 0; i--) {
+        if (
+          sortedDates[i] <= mergeDateStr &&
+          ethPricesData.prices[sortedDates[i]] > 0
+        ) {
+          price = ethPricesData.prices[sortedDates[i]];
+          break;
+        }
+      }
+
+      // If no earlier price found, use the first available
+      if (!price || price <= 0) {
+        for (const d of sortedDates) {
+          if (ethPricesData.prices[d] > 0) {
+            price = ethPricesData.prices[d];
+            break;
+          }
+        }
+      }
+    }
+
+    return price ? { price, mergeDate } : null;
+  }, [ethPricesData, rawScores, currentPrNumber]);
 
   // Prefetch nearby PRs for smooth scrubbing
   const currentPrIndex = prRange
@@ -188,11 +315,32 @@ const TimelinePage = React.memo(function TimelinePage() {
         });
       }
 
-      // Store calculated data in localStorage
+      // Store calculated data in localStorage (only store a subset to avoid quota issues)
       try {
-        localStorage.setItem(storageKey, JSON.stringify(allData));
+        // For large repos, only store the first and last 100 PRs to save space
+        const prNumbers = Object.keys(allData)
+          .map(Number)
+          .sort((a, b) => a - b);
+        if (prNumbers.length > 200) {
+          const toStore: Record<number, UserAttribution[]> = {};
+          // Store first 100
+          prNumbers.slice(0, 100).forEach((prNum) => {
+            toStore[prNum] = allData[prNum];
+          });
+          // Store last 100
+          prNumbers.slice(-100).forEach((prNum) => {
+            toStore[prNum] = allData[prNum];
+          });
+          localStorage.setItem(storageKey, JSON.stringify(toStore));
+        } else {
+          localStorage.setItem(storageKey, JSON.stringify(allData));
+        }
       } catch (storageError) {
+        // If still too large, just clear it and continue
         console.warn("Failed to store timeline in localStorage:", storageError);
+        try {
+          localStorage.removeItem(storageKey);
+        } catch {}
       }
 
       setLoadingProgress(null);
@@ -355,12 +503,40 @@ const TimelinePage = React.memo(function TimelinePage() {
     PaginatedResponse<UserAttribution> | undefined
   >(undefined);
 
+  // Calculate wallet balances for current PR only (with proper memoization)
+  const walletBalances = useMemo(() => {
+    if (
+      !rawScores ||
+      !ethPricesData?.prices ||
+      currentPrNumber === 0 ||
+      !currentPrData
+    ) {
+      return {};
+    }
+
+    // Use the optimized function with current PR's price
+    return calculateWalletBalances(
+      rawScores,
+      ethPricesData.prices,
+      currentPrNumber,
+      currentPrData.price,
+      bucketRewards,
+    );
+  }, [rawScores, ethPricesData, currentPrNumber, currentPrData, bucketRewards]);
+
   // Use preloaded data if available
   useEffect(() => {
     if (preloadedData && preloadedData[currentPrNumber]) {
+      // Merge attribution with wallet balances
+      const itemsWithWallets = preloadedData[currentPrNumber].map((user) => ({
+        ...user,
+        ethBalance: walletBalances[user.userId]?.totalEth || 0,
+        usdBalance: walletBalances[user.userId]?.totalUsd || 0,
+      }));
+
       setDisplayData({
-        items: preloadedData[currentPrNumber],
-        totalCount: preloadedData[currentPrNumber].length,
+        items: itemsWithWallets as any,
+        totalCount: itemsWithWallets.length,
         page: 1,
         pageSize: 10,
         hasNext: false,
@@ -372,9 +548,17 @@ const TimelinePage = React.memo(function TimelinePage() {
           rawScores,
           currentPrNumber,
         );
+
+        // Add wallet balances
+        const withWallets = calculated.map((user) => ({
+          ...user,
+          ethBalance: walletBalances[user.userId]?.totalEth || 0,
+          usdBalance: walletBalances[user.userId]?.totalUsd || 0,
+        }));
+
         setDisplayData({
-          items: calculated,
-          totalCount: calculated.length,
+          items: withWallets as any,
+          totalCount: withWallets.length,
           page: 1,
           pageSize: 10,
           hasNext: false,
@@ -383,7 +567,7 @@ const TimelinePage = React.memo(function TimelinePage() {
         console.error("Failed to calculate timeline:", error);
       }
     }
-  }, [preloadedData, currentPrNumber, rawScores]);
+  }, [preloadedData, currentPrNumber, rawScores, walletBalances]);
 
   // Convert attribution data to InfiniteQuery format for ContributorsList
   const contributorsData = useMemo(() => {
@@ -654,15 +838,98 @@ const TimelinePage = React.memo(function TimelinePage() {
               step={1}
               className="flex-1"
             />
-            <div className="text-sm font-mono whitespace-nowrap min-w-[120px]">
-              PR #{currentPrNumber}
-              <span className="text-muted-foreground ml-2">
-                ({currentPrIndex + 1} / {prRange.prNumbers.length})
-              </span>
+            <div className="flex flex-col items-end min-w-[120px]">
+              <div className="text-sm font-mono whitespace-nowrap">
+                PR #{currentPrNumber}
+                <span className="text-muted-foreground ml-2">
+                  ({currentPrIndex + 1} / {prRange.prNumbers.length})
+                </span>
+              </div>
+              {currentPrData && (
+                <div className="text-xs text-primary font-mono font-semibold">
+                  ${currentPrData.price.toFixed(2)}
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Reward Allocation Config */}
+      {ethPricesData?.prices ? (
+        <div className="mb-6 p-4 bg-muted/30 rounded-lg border border-muted">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">
+                Reward allocation:
+              </span>{" "}
+              Buy ETH at each PR's merge price, valued at current $
+              {currentEthPrice.toFixed(0)}
+            </p>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Scale:</span>
+              <Slider
+                value={[rewardMultiplier]}
+                onValueChange={(value: number[]) =>
+                  setRewardMultiplier(value[0])
+                }
+                min={0.1}
+                max={10}
+                step={0.1}
+                className="w-32"
+              />
+              <span className="text-xs font-mono w-10 text-right">
+                {rewardMultiplier.toFixed(1)}x
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 text-xs">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-sm bg-primary-100" />
+              <span className="text-muted-foreground">
+                Exceptional:{" "}
+                <span className="font-mono text-foreground">
+                  ${bucketRewards[3].toFixed(2)}
+                </span>
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-sm bg-primary-60" />
+              <span className="text-muted-foreground">
+                High:{" "}
+                <span className="font-mono text-foreground">
+                  ${bucketRewards[2].toFixed(2)}
+                </span>
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-sm bg-primary-30" />
+              <span className="text-muted-foreground">
+                Medium:{" "}
+                <span className="font-mono text-foreground">
+                  ${bucketRewards[1].toFixed(2)}
+                </span>
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-sm bg-primary-15" />
+              <span className="text-muted-foreground">
+                Low:{" "}
+                <span className="font-mono text-foreground">
+                  ${bucketRewards[0].toFixed(2)}
+                </span>
+              </span>
+            </div>
+          </div>
+        </div>
+      ) : minDate && maxDate ? (
+        <div className="mb-6 p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
+          <p className="text-xs text-amber-600 dark:text-amber-400">
+            <span className="font-medium">Note:</span> Historical ETH prices
+            unavailable. Wallet balances will not be displayed.
+          </p>
+        </div>
+      ) : null}
 
       {/* Contributors List */}
       <div className="bg-card rounded-lg border p-6 relative">
@@ -715,6 +982,18 @@ const TimelinePage = React.memo(function TimelinePage() {
           </div>
         )}
 
+        {/* ETH Price Indicator */}
+        {currentPrData && (
+          <div className="absolute bottom-4 left-4 text-xs font-mono">
+            <div className="text-muted-foreground">
+              Merged: {currentPrData.mergeDate.toLocaleDateString()}
+            </div>
+            <div className="text-primary font-semibold">
+              ETH: ${currentPrData.price.toFixed(2)}
+            </div>
+          </div>
+        )}
+
         {/* Merit Logo Watermark */}
         <div className="absolute bottom-4 right-4 opacity-70 transition-opacity">
           <img
@@ -729,6 +1008,17 @@ const TimelinePage = React.memo(function TimelinePage() {
           />
         </div>
       </div>
+
+      {/* Top Earners Leaderboard */}
+      {ethPricesData?.prices && Object.keys(walletBalances).length > 0 && (
+        <div className="mt-6">
+          <TopEarnersLeaderboard
+            walletBalances={walletBalances as any}
+            currentEthPrice={currentPrData?.price || currentEthPrice}
+            topN={10}
+          />
+        </div>
+      )}
     </div>
   );
 });
