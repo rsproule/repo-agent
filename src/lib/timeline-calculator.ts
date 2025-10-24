@@ -5,6 +5,7 @@ interface PrScore {
   author: string;
   bucket: number;
   score: number;
+  mergedAt: string | null;
 }
 
 /**

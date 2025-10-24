@@ -14,6 +14,11 @@ import type {
   UserAttribution,
 } from "@/lib/attribution";
 
+interface UserAttributionWithWallet extends UserAttribution {
+  ethBalance?: number;
+  usdBalance?: number;
+}
+
 interface UserRepoSearchResult {
   id: number;
   login: string;
@@ -194,7 +199,7 @@ export const ContributorsList: React.FC<Props> = ({
 };
 
 interface UserRowProps {
-  user: UserAttribution;
+  user: UserAttributionWithWallet;
   style?: React.CSSProperties;
   maxPct: number;
   filterUser?: UserRepoSearchResult;
@@ -237,8 +242,10 @@ const UserRow: React.FC<UserRowProps> = ({
         <AvatarFallback>{user.userId.charAt(0).toUpperCase()}</AvatarFallback>
       </Avatar>
       <div className="flex flex-1 overflow-hidden w-full flex-row items-center justify-between gap-4">
-        <VStack className="items-start flex-1 gap-0">
-          <div className="text-sm font-semibold truncate">{user.userId}</div>
+        <VStack className="items-start flex-1 gap-0 min-w-0">
+          <div className="text-sm font-semibold truncate max-w-full">
+            {user.userId}
+          </div>
           <div className="text-xs text-primary">
             {user.pct.toLocaleString(undefined, {
               style: "percent",
@@ -246,7 +253,8 @@ const UserRow: React.FC<UserRowProps> = ({
             })}
           </div>
         </VStack>
-        <div className="w-64 md:w-96 -scale-x-100">
+
+        <div className="w-40 md:w-64 -scale-x-100">
           <AttributionBar
             width={(user.pct / maxPct) * 100}
             bucketAttributions={[
@@ -257,6 +265,16 @@ const UserRow: React.FC<UserRowProps> = ({
             ]}
           />
         </div>
+
+        {user.usdBalance !== undefined && user.usdBalance > 0 && (
+          <div className="text-sm font-mono font-semibold text-primary whitespace-nowrap flex-shrink-0 w-32 text-right">
+            $
+            {user.usdBalance.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
