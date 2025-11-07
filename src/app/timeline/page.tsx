@@ -668,28 +668,25 @@ const TimelinePage = React.memo(function TimelinePage() {
       <div className="bg-card rounded-lg border p-6 relative">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold">
-            Top 10 contributors by <span className="text-primary">Impact</span>{" "}
-            in {owner}/{repo}
+            Top 10 contributors by PR{" "}
+            <span className="text-primary">Impact</span> in {owner}/{repo}{" "}
+            (2014-present)
           </h2>
 
           {/* Legend */}
           <div className="flex items-center gap-3 text-xs">
             <span className="text-muted-foreground">Impact:</span>
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-sm bg-primary-15" />
+              <div className="w-3 h-3 rounded-sm bg-primary-30" />
               <span className="text-muted-foreground">Low</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-sm bg-primary-30" />
+              <div className="w-3 h-3 rounded-sm bg-primary-60" />
               <span className="text-muted-foreground">Med</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-sm bg-primary-60" />
-              <span className="text-muted-foreground">High</span>
-            </div>
-            <div className="flex items-center gap-1">
               <div className="w-3 h-3 rounded-sm bg-primary-100" />
-              <span className="text-muted-foreground">Max</span>
+              <span className="text-muted-foreground">High</span>
             </div>
           </div>
         </div>
@@ -716,7 +713,7 @@ const TimelinePage = React.memo(function TimelinePage() {
         )}
 
         {/* Merit Logo Watermark */}
-        <div className="absolute bottom-4 right-4 opacity-70 transition-opacity">
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 opacity-70 transition-opacity">
           <img
             src="/logo/merit-dark.png"
             alt="Merit"
