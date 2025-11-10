@@ -38,7 +38,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@radix-ui/react-use-controllable-state": "^1.2.2",
     "@tanstack/react-query": "^5.90.3",
-    "@trigger.dev/sdk": "^4.0.4",
+    "@trigger.dev/sdk": "4.0.6",
     "@xyflow/react": "^12.8.6",
     "ai": "^5.0.35",
     "autonumeric": "^4.10.9",
